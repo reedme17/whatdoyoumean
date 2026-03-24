@@ -7,7 +7,7 @@ import { useEffect, useRef, useCallback, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import type { ServerEvent } from "@wdym/shared";
 
-const WS_URL = "http://localhost:3000";
+const WS_URL = "http://localhost:3001";
 
 export type ServerEventHandler = (event: ServerEvent) => void;
 
@@ -25,14 +25,15 @@ export function useSocket(onEvent: ServerEventHandler): UseSocketReturn {
 
   useEffect(() => {
     const socket = io(WS_URL, {
-      path: "/ws",
-      transports: ["websocket"],
+      transports: ["polling", "websocket"],
       autoConnect: true,
+      timeout: 10000,
     });
     socketRef.current = socket;
 
-    socket.on("connect", () => setConnected(true));
-    socket.on("disconnect", () => setConnected(false));
+    socket.on("connect", () => { console.log("[WS] Connected!"); setConnected(true); });
+    socket.on("disconnect", () => { console.log("[WS] Disconnected"); setConnected(false); });
+    socket.on("connect_error", (err) => { console.log("[WS] Connect error:", err.message); });
 
     // Listen for all server event types
     const eventTypes = [
@@ -62,6 +63,7 @@ export function useSocket(onEvent: ServerEventHandler): UseSocketReturn {
 
   const send = useCallback(
     (event: { type: string; [key: string]: unknown }) => {
+      console.log("[WS] Sending:", event.type, socketRef.current?.connected ? "(connected)" : "(NOT connected)");
       socketRef.current?.emit(event.type, event);
     },
     []

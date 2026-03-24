@@ -51,9 +51,18 @@ export function setupWebSocket(
   const httpServer = app.server as HttpServer;
   const io = new SocketIOServer(httpServer, {
     cors: { origin: "*" },
-    path: "/ws",
   });
+  setupWebSocketHandlers(io, deps);
+  return io;
+}
 
+/**
+ * Wire event handlers on an existing Socket.IO server instance.
+ */
+export function setupWebSocketHandlers(
+  io: SocketIOServer,
+  deps: WsHandlerDeps,
+): void {
   const sessionManager = new SessionManager();
   const bookmarkService = new BookmarkService();
   const semanticAnalyzer = new SemanticAnalyzer(deps.llmGateway);
@@ -61,6 +70,7 @@ export function setupWebSocket(
   const visualizationEngine = new VisualizationEngine();
 
   io.on("connection", (socket: Socket) => {
+    console.log("[WS] Client connected:", socket.id);
     const state: SocketSessionState = {
       sessionId: null,
       userId: socket.handshake.auth?.userId ?? "anonymous",
@@ -98,6 +108,7 @@ export function setupWebSocket(
 
     socket.on("session:start", (data: Extract<ClientEvent, { type: "session:start" }>) => {
       try {
+        console.log("[WS] session:start received", data?.config?.mode);
         const session = sessionManager.create({
           userId: state.userId,
           mode: data.config.mode === "online" ? "online" : "offline",
@@ -160,6 +171,7 @@ export function setupWebSocket(
 
     socket.on("text:submit", (data: Extract<ClientEvent, { type: "text:submit" }>) => {
       try {
+        console.log("[WS] text:submit received, sessionId:", state.sessionId, "text length:", data?.text?.length);
         if (!state.sessionId) throw new Error("No active session");
         processTextSubmit(
           socket, state, data.text,
@@ -203,8 +215,6 @@ export function setupWebSocket(
       }
     });
   });
-
-  return io;
 }
 
 // ── Pipeline helpers ──
@@ -218,6 +228,7 @@ async function processFinalTranscript(
   visualizer: VisualizationEngine,
 ): Promise<void> {
   try {
+    console.log("[WS] processFinalTranscript starting for segment:", segment.text.slice(0, 50));
     const context: SessionContext = {
       sessionId: state.sessionId!,
       recentTranscripts: state.transcripts.slice(-10),
@@ -226,7 +237,9 @@ async function processFinalTranscript(
     };
 
     // Semantic analysis → card
+    console.log("[WS] Calling analyzer.analyze()...");
     const card = await analyzer.analyze(segment, context);
+    console.log("[WS] Card created:", card.content.slice(0, 50));
     const format = visualizer.selectFormat(card);
     card.visualizationFormat = format;
     state.cards.push(card);
@@ -257,6 +270,7 @@ async function processFinalTranscript(
       emitServerEvent(socket, { type: "recommendation:new", recommendations });
     }
   } catch (err) {
+    console.error("[WS] Pipeline error:", err);
     emitError(socket, "pipeline", String(err), true);
   }
 }
@@ -270,8 +284,10 @@ async function processTextSubmit(
   visualizer: VisualizationEngine,
 ): Promise<void> {
   try {
+    console.log("[WS] processTextSubmit starting, text:", text.slice(0, 50));
     // Detect language from text
     const langResult = state.languageDetector.detectFromText(text);
+    console.log("[WS] Language detected:", langResult.primaryLanguage);
 
     // Create a synthetic transcript segment
     const segment: TranscriptSegment = {

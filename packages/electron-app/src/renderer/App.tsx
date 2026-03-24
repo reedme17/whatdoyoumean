@@ -70,6 +70,9 @@ export function App(): React.JSX.Element {
           setCards((prev) => [...prev, currentCard]);
         }
         setCurrentCard((event as Extract<ServerEvent, { type: "card:created" }>).card);
+        // Also update textCards if analyzing in text mode
+        setTextCards((prev) => [...prev, (event as Extract<ServerEvent, { type: "card:created" }>).card]);
+        setAnalyzing(false);
         break;
 
       case "card:updated": {
@@ -86,6 +89,9 @@ export function App(): React.JSX.Element {
 
       case "recommendation:new":
         setRecommendations(
+          (event as Extract<ServerEvent, { type: "recommendation:new" }>).recommendations
+        );
+        setTextRecs(
           (event as Extract<ServerEvent, { type: "recommendation:new" }>).recommendations
         );
         break;
@@ -196,41 +202,39 @@ export function App(): React.JSX.Element {
     setTextCards([]);
     setTextRecs([]);
 
-    // Send text to backend via WebSocket
-    send({ type: "text:submit", text });
+    // Start a text-mode session first, then submit text
+    send({ type: "session:start", config: { mode: "offline", sampleRate: 16000, channels: 1, noiseSuppression: false, autoGain: false } });
 
-    // Also try REST fallback for text mode
-    try {
-      const res = await fetch("http://localhost:3000/api/sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "text", text, userId }),
+    // Small delay to let session initialize, then submit text
+    setTimeout(() => {
+      send({ type: "text:submit", text });
+    }, 200);
+
+    // Wait for results via WebSocket (handled by handleServerEvent)
+    // Set a timeout to show mock results if nothing comes back
+    setTimeout(() => {
+      setAnalyzing((prev) => {
+        if (prev) {
+          // No results came back — show the text as a basic card
+          const mockCard: CoreMeaningCard = {
+            id: "tc_" + Date.now(),
+            sessionId: "",
+            category: "factual_statement",
+            content: text.slice(0, 100),
+            sourceSegmentIds: [],
+            linkedCardIds: [],
+            linkType: null,
+            topicId: "",
+            visualizationFormat: "concise_text",
+            isHighlighted: false,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+          setTextCards([mockCard]);
+        }
+        return false;
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.cards) setTextCards(data.cards);
-        if (data.recommendations) setTextRecs(data.recommendations);
-      }
-    } catch {
-      // Backend may not be running — show mock results
-      const mockCard: CoreMeaningCard = {
-        id: "tc_" + Date.now(),
-        sessionId: "",
-        category: "factual_statement",
-        content: text.slice(0, 100),
-        sourceSegmentIds: [],
-        linkedCardIds: [],
-        linkType: null,
-        topicId: "",
-        visualizationFormat: "concise_text",
-        isHighlighted: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      setTextCards([mockCard]);
-    }
-
-    setAnalyzing(false);
+    }, 10000); // 10s timeout
   };
 
   const handleExport = () => {
