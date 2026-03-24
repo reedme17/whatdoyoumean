@@ -1,0 +1,73 @@
+{
+  "app.name": "啥意思",
+  "app.tagline": "实时对话理解工具",
+
+  "session.start": "开始会话",
+  "session.pause": "暂停",
+  "session.resume": "继续",
+  "session.stop": "停止",
+  "session.end": "结束会话",
+  "session.active": "进行中",
+  "session.paused": "已暂停",
+  "session.ended": "已结束",
+  "session.listening": "正在收听...",
+  "session.waiting": "等待语音输入...",
+
+  "textMode.title": "文本模式",
+  "textMode.placeholder": "在此粘贴或输入文本...",
+  "textMode.analyze": "分析",
+  "textMode.analyzing": "分析中...",
+  "textMode.charLimit": "支持中文、英文及混合语言文本（最多5000字符）",
+
+  "recap.title": "会话回顾",
+  "recap.export": "导出",
+  "recap.noCards": "此会话没有卡片。",
+  "recap.flaggedMoments": "标记时刻",
+
+  "card.category.factual_statement": "事实",
+  "card.category.opinion": "观点",
+  "card.category.question": "问题",
+  "card.category.decision": "决定",
+  "card.category.action_item": "待办",
+  "card.category.disagreement": "分歧",
+  "card.link.contradicts": "与之前观点矛盾",
+  "card.link.modifies": "修改之前观点",
+  "card.link.extends": "扩展之前观点",
+
+  "recommendation.label": "推荐",
+  "recommendation.copied": "已复制！",
+
+  "history.title": "历史记录",
+  "history.search": "搜索会话...",
+  "history.noSessions": "暂无会话。",
+  "history.noMatch": "没有匹配的会话。",
+  "history.textMode": "文本模式",
+
+  "menu.profile": "个人资料",
+  "menu.history": "历史记录",
+  "menu.settings": "设置",
+  "menu.terminology": "术语",
+  "menu.about": "关于",
+  "menu.signOut": "退出登录",
+
+  "settings.language": "语言",
+  "settings.llmProvider": "LLM 提供商",
+  "settings.sttMode": "语音识别模式",
+  "settings.memory": "记忆",
+  "settings.enabled": "已启用",
+
+  "login.signInApple": "使用 Apple 登录",
+  "login.signInGoogle": "使用 Google 登录",
+  "login.signInEmail": "使用邮箱登录",
+
+  "terminology.empty": "暂无已学习的术语。使用应用后术语将显示在此处。",
+
+  "about.version": "版本",
+
+  "warning.lowBattery": "电量不足 — 建议暂停或结束会话",
+  "warning.lowStorage": "存储空间不足 — 以精简模式继续",
+  "warning.concurrentAudio": "其他应用正在录音",
+
+  "error.noSession": "没有活跃会话",
+  "error.generic": "出了点问题"
+}

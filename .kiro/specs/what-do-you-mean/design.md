@@ -106,7 +106,7 @@ graph TB
 | Cloud STT (English) | Groq Whisper Large v3 Turbo | $0.04/hr, 216x real-time speed, 0.5s latency, OpenAI-compatible API |
 | Cloud STT (Chinese) | Alibaba DashScope Qwen ASR | Best-in-class Chinese and dialect accuracy |
 | LLM Providers | Cerebras GPT-OSS-120B (primary), OpenAI GPT-4o, Anthropic Claude, Google Gemini | Cerebras: 2,224 t/s output speed, free tier 1M tokens/day, Apache 2.0 open-source; others as fallback for redundancy |
-| Auth | JWT + OAuth 2.0 (Apple Sign-In, Google) | Cross-platform auth with token-based sessions |
+| Auth | Guest mode (no login required) + JWT + OAuth 2.0 (Apple Sign-In, Google) | Core features work without auth; sign-in unlocks history, sync, memory, export |
 | Deployment | AWS (ECS Fargate + CloudFront + RDS) | Managed infrastructure, global CDN for web app |
 | CI/CD | GitHub Actions | Automated build, test, deploy pipeline |
 
@@ -586,7 +586,7 @@ GET    /api/providers/stats             # LLM provider stats
 ```typescript
 interface ConversationSession {
   id: string;                          // UUID
-  userId: string;                      // FK to User
+  userId: string | null;               // FK to User, null for guest sessions
   mode: 'online' | 'offline' | 'text'; // capture mode
   status: 'active' | 'paused' | 'ended';
   startedAt: Date;

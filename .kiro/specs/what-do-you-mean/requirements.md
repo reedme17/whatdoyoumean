@@ -308,17 +308,21 @@ Target Users: Individual / personal users
 6. THE iOS_Application SHALL integrate with iOS share sheet to allow exporting session archives to other applications
 7. WHEN the device is in Do Not Disturb mode, THE iOS_Application SHALL continue active session capture without interruption
 
-### Requirement 21: User Onboarding and Settings
+### Requirement 21: Guest Mode and User Onboarding
 
-**User Story:** As a new user, I want a simple onboarding experience and clear settings, so that I can start using the tool quickly and customize it to my preferences.
+**User Story:** As a new user, I want to use the core features (live session, text mode) immediately without signing in, so that I can try the tool with zero friction. I can sign in later to unlock additional features.
 
 > **Note:** Detailed onboarding flow and settings UI will be covered in `ux.md`.
 
 #### Acceptance Criteria
 
-1. WHEN a user opens the application for the first time, THE application SHALL present a brief onboarding flow explaining core functionality
-2. THE application SHALL provide a settings screen where the user can configure: preferred display language, default audio input device, LLM provider preference, STT mode preference, and Conversation_Memory storage preference
-3. WHEN the user completes onboarding, THE application SHALL request necessary permissions (microphone, and notifications on iOS) with clear explanations of why each permission is needed
+1. WHEN a user opens the application for the first time, THE application SHALL launch directly to the Home Screen in guest mode — no login required
+2. IN guest mode, THE application SHALL allow the user to start live sessions, use text mode, and view real-time Core_Meaning_Cards and recommendations
+3. IN guest mode, THE following features SHALL be locked and require sign-in to access: session history, conversation memory, cross-device sync, terminology dictionary, user profile, and session export
+4. THE Home Screen SHALL display a sign-in entry point (within the expand panel) that allows the user to sign in at any time to unlock locked features
+5. WHEN the user signs in, THE application SHALL transition from guest mode to authenticated mode, preserving any active session state
+6. THE application SHALL provide a settings screen where the user can configure: preferred display language, default audio input device, LLM provider preference, STT mode preference, and Conversation_Memory storage preference
+7. WHEN the application first requests microphone access, THE application SHALL explain why the permission is needed
 
 ### Requirement 22: Conversation Bookmarks and Highlights
 

@@ -1,0 +1,73 @@
+{
+  "app.name": "What Do You Mean",
+  "app.tagline": "Real-time conversation understanding",
+
+  "session.start": "Start Session",
+  "session.pause": "Pause",
+  "session.resume": "Resume",
+  "session.stop": "Stop",
+  "session.end": "End Session",
+  "session.active": "Active",
+  "session.paused": "Paused",
+  "session.ended": "Ended",
+  "session.listening": "Listening...",
+  "session.waiting": "Waiting for speech...",
+
+  "textMode.title": "Text Mode",
+  "textMode.placeholder": "Paste or type text here...",
+  "textMode.analyze": "Analyze",
+  "textMode.analyzing": "Analyzing...",
+  "textMode.charLimit": "Supports Chinese, English, and mixed-language text (up to 5000 characters)",
+
+  "recap.title": "Session Recap",
+  "recap.export": "Export",
+  "recap.noCards": "No cards in this session.",
+  "recap.flaggedMoments": "Flagged moments",
+
+  "card.category.factual_statement": "Fact",
+  "card.category.opinion": "Opinion",
+  "card.category.question": "Question",
+  "card.category.decision": "Decision",
+  "card.category.action_item": "Action",
+  "card.category.disagreement": "Disagree",
+  "card.link.contradicts": "Contradicts previous point",
+  "card.link.modifies": "Modifies previous point",
+  "card.link.extends": "Extends previous point",
+
+  "recommendation.label": "Recommendations",
+  "recommendation.copied": "Copied!",
+
+  "history.title": "History",
+  "history.search": "Search sessions...",
+  "history.noSessions": "No sessions yet.",
+  "history.noMatch": "No matching sessions.",
+  "history.textMode": "text mode",
+
+  "menu.profile": "Profile",
+  "menu.history": "History",
+  "menu.settings": "Settings",
+  "menu.terminology": "Terminology",
+  "menu.about": "About",
+  "menu.signOut": "Sign Out",
+
+  "settings.language": "Language",
+  "settings.llmProvider": "LLM Provider",
+  "settings.sttMode": "STT Mode",
+  "settings.memory": "Memory",
+  "settings.enabled": "Enabled",
+
+  "login.signInApple": "Sign in with Apple",
+  "login.signInGoogle": "Sign in with Google",
+  "login.signInEmail": "Sign in with Email",
+
+  "terminology.empty": "No learned terms yet. Terms will appear here as you use the app.",
+
+  "about.version": "Version",
+
+  "warning.lowBattery": "Low battery — consider pausing or ending the session",
+  "warning.lowStorage": "Low storage — continuing in reduced mode",
+  "warning.concurrentAudio": "Another app is capturing audio",
+
+  "error.noSession": "No active session",
+  "error.generic": "Something went wrong"
+}

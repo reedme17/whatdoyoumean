@@ -1,0 +1,23 @@
+{
+  "name": "what-do-you-mean",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Real-time conversation understanding tool (啥意思)",
+  "workspaces": [
+    "packages/shared",
+    "packages/backend",
+    "packages/electron-app"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "build:shared": "npm run build -w packages/shared",
+    "build:backend": "npm run build -w packages/backend",
+    "build:electron": "npm run build -w packages/electron-app",
+    "dev:backend": "npm run dev -w packages/backend",
+    "clean": "npm run clean --workspaces",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

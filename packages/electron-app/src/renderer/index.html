@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:3000 ws://localhost:3000" />
+    <title>啥意思</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; background: #fff; color: #000; }
+      #root { width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; }
+      /* Draggable title bar region for hiddenInset style */
+      .titlebar-drag {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 38px;
+        -webkit-app-region: drag;
+        z-index: 9999;
+        pointer-events: none;
+      }
+      /* Make buttons inside the drag region clickable */
+      button, a, input, textarea, select, [role="button"] {
+        -webkit-app-region: no-drag;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="titlebar-drag"></div>
+    <div id="root"></div>
+    <script src="./index.js"></script>
+  </body>
+</html>
