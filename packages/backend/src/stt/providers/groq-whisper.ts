@@ -84,6 +84,43 @@ export class GroqWhisperProvider implements STTProvider {
     return { text: response.text, latencyMs };
   }
 
+  /**
+   * Transcribe base64-encoded WAV audio from the renderer.
+   * Converts the base64 string to a Buffer and calls the Groq API.
+   */
+  async transcribeBase64Wav(
+    audioBase64: string,
+    language = "en",
+  ): Promise<{ text: string; latencyMs: number }> {
+    const client = this.getClient();
+    if (!client) throw new Error("Groq API key not configured");
+
+    // Polyfill File for Node 18
+    if (typeof globalThis.File === "undefined") {
+      const { File } = await import("node:buffer");
+      globalThis.File = File as unknown as typeof globalThis.File;
+    }
+
+    // Decode base64 to Node.js Buffer
+    const audioBuffer = Buffer.from(audioBase64, "base64");
+
+    // Use OpenAI SDK's toFile helper (works in Node 18 without global File)
+    const { toFile } = await import("openai/uploads");
+    const file = await toFile(audioBuffer, "audio.wav", { type: "audio/wav" });
+
+    const start = Date.now();
+    const response = await client.audio.transcriptions.create({
+      file,
+      model: "whisper-large-v3-turbo",
+      language,
+      response_format: "json",
+    });
+    const latencyMs = Date.now() - start;
+
+    console.log(`[GroqWhisper] Transcribed in ${latencyMs}ms: "${response.text.slice(0, 80)}"`);
+    return { text: response.text, latencyMs };
+  }
+
   private emitResult(
     chunk: AudioChunk,
     text: string,

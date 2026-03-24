@@ -25,6 +25,7 @@ import { RecommendationEngine } from "../recommendation/engine.js";
 import { VisualizationEngine } from "../visualization/engine.js";
 import { LanguageDetector } from "../language/detector.js";
 import { TranscriptionEngine } from "../stt/engine.js";
+import { GroqWhisperProvider } from "../stt/providers/groq-whisper.js";
 import type { LLMGateway } from "../llm/gateway.js";
 
 export interface WsHandlerDeps {
@@ -158,12 +159,25 @@ export function setupWebSocketHandlers(
       }
     });
 
-    socket.on("audio:chunk", (data: Extract<ClientEvent, { type: "audio:chunk" }>) => {
+    socket.on("audio:chunk", (data: { type: string; audioBase64?: string; format?: string; sampleRate?: number; data?: unknown }) => {
       try {
         if (!state.sessionId) throw new Error("No active session");
         const session = sessionManager.get(state.sessionId);
         if (session?.status !== "active") return;
-        state.transcriptionEngine.feedAudio(data.data);
+
+        // New path: base64-encoded WAV from renderer audio capture
+        if (data.audioBase64 && typeof data.audioBase64 === "string") {
+          processAudioChunk(
+            socket, state, data.audioBase64,
+            semanticAnalyzer, recommendationEngine, visualizationEngine,
+          );
+          return;
+        }
+
+        // Legacy path: raw AudioChunk via TranscriptionEngine
+        if (data.data) {
+          state.transcriptionEngine.feedAudio(data.data as any);
+        }
       } catch (err) {
         emitError(socket, "stt", String(err), true);
       }
@@ -218,6 +232,59 @@ export function setupWebSocketHandlers(
 }
 
 // ── Pipeline helpers ──
+
+/** Shared Groq Whisper provider instance for audio chunk transcription */
+const groqWhisper = new GroqWhisperProvider();
+
+async function processAudioChunk(
+  socket: Socket,
+  state: SocketSessionState,
+  audioBase64: string,
+  analyzer: SemanticAnalyzer,
+  recommender: RecommendationEngine,
+  visualizer: VisualizationEngine,
+): Promise<void> {
+  try {
+    console.log(`[WS] processAudioChunk: ${Math.round(audioBase64.length / 1024)}KB base64`);
+
+    // Transcribe via Groq Whisper
+    const { text, latencyMs } = await groqWhisper.transcribeBase64Wav(audioBase64, "en");
+
+    if (!text || text.trim().length === 0) {
+      console.log("[WS] Empty transcription — skipping");
+      return;
+    }
+
+    console.log(`[WS] Groq transcription (${latencyMs}ms): "${text.slice(0, 80)}"`);
+
+    // Create a TranscriptSegment from the transcription
+    const segment: TranscriptSegment = {
+      id: `groq_audio_${Date.now()}`,
+      sessionId: state.sessionId!,
+      text,
+      languageCode: "en",
+      speakerId: "user",
+      startTime: Date.now() - latencyMs,
+      endTime: Date.now(),
+      isFinal: true,
+      confidence: 0.95,
+      provider: "groq_whisper",
+      createdAt: new Date(),
+    };
+
+    state.transcripts.push(segment);
+    emitServerEvent(socket, { type: "transcript:final", segment });
+
+    // Run through the full semantic pipeline
+    await processFinalTranscript(
+      socket, state, segment,
+      analyzer, recommender, visualizer,
+    );
+  } catch (err) {
+    console.error("[WS] Audio chunk processing error:", err);
+    emitError(socket, "stt", String(err), true);
+  }
+}
 
 async function processFinalTranscript(
   socket: Socket,

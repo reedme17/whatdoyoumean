@@ -15,6 +15,7 @@ import type {
   ServerEvent,
 } from "@wdym/shared";
 import { useSocket } from "./hooks/useSocket.js";
+import { useAudioCapture } from "./hooks/useAudioCapture.js";
 import { LoginScreen } from "./components/LoginScreen.js";
 import { HomeScreen } from "./components/HomeScreen.js";
 import { LiveSession } from "./components/LiveSession.js";
@@ -64,16 +65,16 @@ export function App(): React.JSX.Element {
   // ── WebSocket ──
   const handleServerEvent = useCallback((event: ServerEvent) => {
     switch (event.type) {
-      case "card:created":
-        // Finalize current card, push to stack
-        if (currentCard) {
-          setCards((prev) => [...prev, currentCard]);
-        }
-        setCurrentCard((event as Extract<ServerEvent, { type: "card:created" }>).card);
-        // Also update textCards if analyzing in text mode
-        setTextCards((prev) => [...prev, (event as Extract<ServerEvent, { type: "card:created" }>).card]);
+      case "card:created": {
+        const newCard = (event as Extract<ServerEvent, { type: "card:created" }>).card;
+        // Push directly to cards array (no currentCard staging)
+        setCards((prev) => [...prev, newCard]);
+        setCurrentCard(newCard);
+        // Also update textCards for text mode
+        setTextCards((prev) => [...prev, newCard]);
         setAnalyzing(false);
         break;
+      }
 
       case "card:updated": {
         const updated = (event as Extract<ServerEvent, { type: "card:updated" }>).card;
@@ -102,6 +103,9 @@ export function App(): React.JSX.Element {
   }, [currentCard]);
 
   const { send } = useSocket(handleServerEvent);
+
+  // ── Audio capture (renderer-side mic → base64 WAV → backend via WS) ──
+  const { startCapture, stopCapture, isCapturing, error: audioError } = useAudioCapture({ send });
 
   // ── Handlers ──
 
@@ -133,7 +137,17 @@ export function App(): React.JSX.Element {
     sessionStartRef.current = Date.now();
     setScreen("live");
 
-    // Start audio capture via Electron IPC
+    // Notify backend to start session
+    send({ type: "session:start", config: { mode: "online", sampleRate: 16000, channels: 1, noiseSuppression: true, autoGain: true } });
+
+    // Start real audio capture in renderer (getUserMedia → base64 WAV → WS)
+    try {
+      await startCapture();
+    } catch {
+      console.warn("[App] Renderer audio capture failed — falling back to stub");
+    }
+
+    // Also try Electron IPC audio capture (stub for now)
     try {
       await window.electronAPI?.startSession({
         mode: "online",
@@ -145,9 +159,6 @@ export function App(): React.JSX.Element {
     } catch {
       // Audio capture may not be available in dev
     }
-
-    // Notify backend
-    send({ type: "session:start", config: { mode: "online", sampleRate: 16000, channels: 1, noiseSuppression: true, autoGain: true } });
   };
 
   const handleStop = async () => {
@@ -157,7 +168,10 @@ export function App(): React.JSX.Element {
       setCurrentCard(null);
     }
 
-    // Stop audio capture
+    // Stop renderer audio capture
+    stopCapture();
+
+    // Stop Electron IPC audio capture (stub)
     try {
       await window.electronAPI?.stopSession();
     } catch {
@@ -333,6 +347,8 @@ export function App(): React.JSX.Element {
           currentCard={currentCard}
           recommendations={recommendations}
           speakers={speakers}
+          isCapturing={isCapturing}
+          audioError={audioError}
           onFlag={handleFlag}
           onStop={handleStop}
         />

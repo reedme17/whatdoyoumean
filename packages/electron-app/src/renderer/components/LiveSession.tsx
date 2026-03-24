@@ -16,6 +16,8 @@ interface Props {
   currentCard: CoreMeaningCard | null;
   recommendations: Recommendation[];
   speakers: Map<string, string>;
+  isCapturing?: boolean;
+  audioError?: string | null;
   onFlag: () => void;
   onStop: () => void;
 }
@@ -25,6 +27,8 @@ export function LiveSession({
   currentCard,
   recommendations,
   speakers,
+  isCapturing = false,
+  audioError = null,
   onFlag,
   onStop,
 }: Props): React.JSX.Element {
@@ -91,14 +95,35 @@ export function LiveSession({
           <div
             style={{
               display: "flex",
+              flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
               height: "100%",
               color: colors.muted,
               fontSize: 14,
+              gap: 8,
             }}
           >
-            Waiting for speech...
+            {audioError ? (
+              <>
+                <span style={{ color: "#dc2626" }}>⚠ Mic error: {audioError}</span>
+                <span>Waiting for speech...</span>
+              </>
+            ) : isCapturing ? (
+              <>
+                <span style={{
+                  display: "inline-block",
+                  width: 10,
+                  height: 10,
+                  borderRadius: "50%",
+                  background: "#dc2626",
+                  animation: "pulse 1.5s infinite",
+                }} />
+                <span>Listening... speak into your microphone</span>
+              </>
+            ) : (
+              <span>Waiting for speech...</span>
+            )}
           </div>
         )}
       </div>
