@@ -247,8 +247,8 @@ async function processAudioChunk(
   try {
     console.log(`[WS] processAudioChunk: ${Math.round(audioBase64.length / 1024)}KB base64`);
 
-    // Transcribe via Groq Whisper
-    const { text, latencyMs } = await groqWhisper.transcribeBase64Wav(audioBase64, "en");
+    // Transcribe via Groq Whisper — omit language to let Whisper auto-detect (supports Chinese + English)
+    const { text, latencyMs } = await groqWhisper.transcribeBase64Wav(audioBase64);
 
     if (!text || text.trim().length === 0) {
       console.log("[WS] Empty transcription — skipping");
@@ -257,12 +257,16 @@ async function processAudioChunk(
 
     console.log(`[WS] Groq transcription (${latencyMs}ms): "${text.slice(0, 80)}"`);
 
+    // Detect language from transcribed text
+    const langResult = state.languageDetector.detectFromText(text);
+    console.log(`[WS] Detected language: ${langResult.primaryLanguage}`);
+
     // Create a TranscriptSegment from the transcription
     const segment: TranscriptSegment = {
       id: `groq_audio_${Date.now()}`,
       sessionId: state.sessionId!,
       text,
-      languageCode: "en",
+      languageCode: langResult.primaryLanguage,
       speakerId: "user",
       startTime: Date.now() - latencyMs,
       endTime: Date.now(),

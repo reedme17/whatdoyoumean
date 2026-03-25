@@ -90,7 +90,7 @@ export class GroqWhisperProvider implements STTProvider {
    */
   async transcribeBase64Wav(
     audioBase64: string,
-    language = "en",
+    language?: string,
   ): Promise<{ text: string; latencyMs: number }> {
     const client = this.getClient();
     if (!client) throw new Error("Groq API key not configured");
@@ -112,7 +112,7 @@ export class GroqWhisperProvider implements STTProvider {
     const response = await client.audio.transcriptions.create({
       file,
       model: "whisper-large-v3-turbo",
-      language,
+      ...(language ? { language } : {}), // omit language to let Whisper auto-detect
       response_format: "json",
     });
     const latencyMs = Date.now() - start;

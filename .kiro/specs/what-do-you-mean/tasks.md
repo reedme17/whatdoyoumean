@@ -435,6 +435,63 @@ Build a real-time conversation understanding tool as an Electron Mac App + Nativ
 - [x] 26. Final checkpoint — Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
+## Phase 2 — Integration, Polish, and Production
+
+> Phase 1 (Tasks 1-26) built the core architecture with stubs. Phase 2 focuses on real-world integration, UX polish, and production readiness.
+
+- [ ] 27. System audio capture (desktopCapturer)
+  - [ ] 27.1 Expose desktopCapturer.getSources() via IPC preload bridge
+  - [ ] 27.2 Capture system audio (meeting/call audio) alongside microphone in useAudioCapture hook
+  - [ ] 27.3 Mix system audio + microphone into a single stream, or send as separate channels for speaker diarization
+  - [ ] 27.4 Handle macOS Screen Recording permission prompt
+
+- [ ] 28. LLM prompt optimization
+  - [ ] 28.1 Refine semantic analysis prompt for conversation understanding (not generic summarization)
+  - [ ] 28.2 Tune recommendation prompts for more actionable, context-aware suggestions
+  - [ ] 28.3 Test with real conversation transcripts and iterate on prompt quality
+
+- [ ] 29. DashScope Chinese STT (if Groq Whisper Chinese accuracy insufficient)
+  - [ ] 29.1 Implement real DashScope Qwen ASR API integration (replace stub)
+  - [ ] 29.2 Add language-based STT routing: detect language from first few seconds, route Chinese to DashScope
+  - [ ] 29.3 Add DASHSCOPE_API_KEY to .env and provider initialization
+
+- [ ] 30. UX polish
+  - [ ] 30.1 Card styling — category colors, speaker labels, link indicators
+  - [ ] 30.2 Smooth animations for card appearance and auto-scroll
+  - [ ] 30.3 Recap editing UX — inline edit, delete cards, reorder
+  - [ ] 30.4 Export as Markdown — proper formatting with timestamps
+  - [ ] 30.5 Settings page — functional language/LLM/STT preference controls
+  - [ ] 30.6 Dark mode support
+
+- [ ] 31. Real OAuth login
+  - [ ] 31.1 Apple Sign-In integration (Apple Developer account required)
+  - [ ] 31.2 Google OAuth integration (Google Cloud Console required)
+  - [ ] 31.3 Wire login state to unlock History, Memory, Sync, Terminology features
+
+- [ ] 32. PostgreSQL database (replace in-memory stores)
+  - [ ] 32.1 Set up PostgreSQL + pgvector locally or via Docker
+  - [ ] 32.2 Run migration (001_initial_schema.sql)
+  - [ ] 32.3 Replace in-memory stores with real DB queries (sessions, users, settings, memory, sync)
+  - [ ] 32.4 Implement vector embeddings for Conversation_Memory semantic search
+
+- [ ] 33. Cloud deployment
+  - [ ] 33.1 Dockerize backend
+  - [ ] 33.2 Deploy to AWS (ECS Fargate + RDS + ElastiCache + S3)
+  - [ ] 33.3 Set up CloudFront CDN for static assets
+  - [ ] 33.4 CI/CD pipeline (GitHub Actions)
+
+- [ ] 34. Native iOS App
+  - [ ] 34.1 Set up Xcode project (Swift/SwiftUI, iOS 16+)
+  - [ ] 34.2 Implement iOS audio capture (Apple Speech Framework)
+  - [ ] 34.3 Build iOS UI (same screens as Mac app, adapted for iPhone/iPad)
+  - [ ] 34.4 Connect to shared backend (REST + WebSocket)
+  - [ ] 34.5 iOS Share Sheet export integration
+
+- [ ] 35. Electron app packaging and distribution
+  - [ ] 35.1 Package Electron app with electron-builder for macOS (.dmg)
+  - [ ] 35.2 Code signing and notarization for macOS
+  - [ ] 35.3 Auto-update mechanism
+
 ## Notes
 
 - Tasks marked with `*` are optional and can be skipped for faster MVP
