@@ -23,7 +23,7 @@ import { RecapScreen } from "./components/RecapScreen.js";
 import { TextModeScreen } from "./components/TextModeScreen.js";
 import { ExpandPanel, type SessionSummary } from "./components/ExpandPanel.js";
 
-type Screen = "home" | "live" | "recap" | "text";
+type Screen = "home" | "live" | "recap" | "text" | "processing";
 
 /** Minimal ElectronAPI type for window.electronAPI */
 interface ElectronAPI {
@@ -42,8 +42,14 @@ declare global {
 export function App(): React.JSX.Element {
   // ── Navigation state ──
   const [screen, setScreen] = useState<Screen>("home");
+  const screenRef = useRef<Screen>("home");
   const [userId, setUserId] = useState<string | null>(null);
   const isGuest = userId === null;
+
+  const goToScreen = useCallback((s: Screen) => {
+    screenRef.current = s;
+    setScreen(s);
+  }, []);
 
   // ── Session state ──
   const [cards, setCards] = useState<CoreMeaningCard[]>([]);
@@ -52,6 +58,8 @@ export function App(): React.JSX.Element {
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [speakers] = useState<Map<string, string>>(new Map());
   const sessionStartRef = useRef<number>(0);
+  const [audioSource, setAudioSource] = useState<"mic" | "mic+system">("mic");
+  const [pendingPreview, setPendingPreview] = useState<string>("");
 
   // ── Text mode state ──
   const [textCards, setTextCards] = useState<CoreMeaningCard[]>([]);
@@ -63,16 +71,21 @@ export function App(): React.JSX.Element {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
 
   // ── WebSocket ──
+  // ── WebSocket ──
   const handleServerEvent = useCallback((event: ServerEvent) => {
     switch (event.type) {
       case "card:created": {
         const newCard = (event as Extract<ServerEvent, { type: "card:created" }>).card;
-        // Push directly to cards array (no currentCard staging)
+        const s = screenRef.current;
+        // Accept cards during live, text, or processing (waiting for final card)
+        if (s !== "live" && s !== "text" && s !== "processing") {
+          console.log("[App] Ignoring late card:created on screen:", s);
+          break;
+        }
         setCards((prev) => [...prev, newCard]);
-        setCurrentCard(newCard);
-        // Also update textCards for text mode
         setTextCards((prev) => [...prev, newCard]);
         setAnalyzing(false);
+        setPendingPreview("");
         break;
       }
 
@@ -97,6 +110,18 @@ export function App(): React.JSX.Element {
         );
         break;
 
+      case "pending:preview":
+        setPendingPreview((event as Extract<ServerEvent, { type: "pending:preview" }>).text);
+        break;
+
+      case "session:state": {
+        const sessionState = (event as Extract<ServerEvent, { type: "session:state" }>).state;
+        if (sessionState === "ended" && screenRef.current === "processing") {
+          goToScreen("recap");
+        }
+        break;
+      }
+
       default:
         break;
     }
@@ -105,7 +130,7 @@ export function App(): React.JSX.Element {
   const { send } = useSocket(handleServerEvent);
 
   // ── Audio capture (renderer-side mic → base64 WAV → backend via WS) ──
-  const { startCapture, stopCapture, isCapturing, error: audioError } = useAudioCapture({ send, mode: "online" });
+  const { startCapture, stopCapture, isCapturing, error: audioError, analyser } = useAudioCapture({ send, mode: "online", captureSystem: audioSource === "mic+system" });
 
   // ── Handlers ──
 
@@ -117,8 +142,7 @@ export function App(): React.JSX.Element {
 
   const handleLogout = () => {
     setUserId(null);
-    // Stay on home, revert to guest mode
-    setScreen("home");
+    goToScreen("home");
     resetSession();
   };
 
@@ -130,12 +154,13 @@ export function App(): React.JSX.Element {
     setTextCards([]);
     setTextRecs([]);
     setAnalyzing(false);
+    setPendingPreview("");
   };
 
   const handleStart = async () => {
     resetSession();
     sessionStartRef.current = Date.now();
-    setScreen("live");
+    goToScreen("live");
 
     // Notify backend to start session
     send({ type: "session:start", config: { mode: "online", sampleRate: 16000, channels: 1, noiseSuppression: true, autoGain: true } });
@@ -162,24 +187,26 @@ export function App(): React.JSX.Element {
   };
 
   const handleStop = async () => {
-    // Finalize current card into the stack
-    if (currentCard) {
-      setCards((prev) => [...prev, currentCard]);
-      setCurrentCard(null);
-    }
-
-    // Stop renderer audio capture
+    setCurrentCard(null);
     stopCapture();
 
-    // Stop Electron IPC audio capture (stub)
     try {
       await window.electronAPI?.stopSession();
     } catch {
       // ignore
     }
 
+    // Show processing screen while backend finalizes pending text
+    goToScreen("processing");
     send({ type: "session:end" });
-    setScreen("recap");
+
+    // Fallback: if session:ended never arrives, go to recap after 15s
+    setTimeout(() => {
+      if (screenRef.current === "processing") {
+        console.warn("[App] session:ended timeout — forcing recap");
+        goToScreen("recap");
+      }
+    }, 15000);
 
     // Save to local session list
     const duration = Math.round((Date.now() - sessionStartRef.current) / 60000);
@@ -308,7 +335,7 @@ export function App(): React.JSX.Element {
       // ⌘+T: Text Mode
       if (e.metaKey && !e.shiftKey && e.key === "t" && screen === "home") {
         e.preventDefault();
-        setScreen("text");
+        goToScreen("text");
       }
       // ⌘+E: Export
       if (e.metaKey && !e.shiftKey && e.key === "e" && (screen === "recap" || screen === "text")) {
@@ -329,15 +356,17 @@ export function App(): React.JSX.Element {
   // ── Render ──
 
   return (
-    <div style={{ width: "100%", height: "100%", position: "relative" }}>
+    <div className="w-full h-full relative">
       {screen === "home" && (
         <HomeScreen
           onStart={handleStart}
           onTextMode={() => {
             resetSession();
-            setScreen("text");
+            goToScreen("text");
           }}
           onExpand={() => setPanelOpen(true)}
+          audioSource={audioSource}
+          onToggleAudioSource={() => setAudioSource((s) => s === "mic" ? "mic+system" : "mic")}
         />
       )}
 
@@ -349,9 +378,18 @@ export function App(): React.JSX.Element {
           speakers={speakers}
           isCapturing={isCapturing}
           audioError={audioError}
+          analyser={analyser}
           onFlag={handleFlag}
           onStop={handleStop}
+          pendingPreview={pendingPreview}
         />
+      )}
+
+      {screen === "processing" && (
+        <div className="flex flex-col items-center justify-center h-full bg-background text-foreground gap-3">
+          <div className="w-5 h-5 rounded-full border-2 border-foreground border-t-transparent animate-spin" />
+          <span className="text-sm text-muted">Processing...</span>
+        </div>
       )}
 
       {screen === "recap" && (
@@ -361,7 +399,7 @@ export function App(): React.JSX.Element {
           bookmarks={bookmarks}
           speakers={speakers}
           onExport={handleExport}
-          onClose={() => setScreen("home")}
+          onClose={() => goToScreen("home")}
           onEditCard={handleEditCard}
         />
       )}
@@ -371,7 +409,7 @@ export function App(): React.JSX.Element {
           onAnalyze={handleTextAnalyze}
           onClose={() => {
             resetSession();
-            setScreen("home");
+            goToScreen("home");
           }}
           cards={textCards}
           recommendations={textRecs}
@@ -388,7 +426,7 @@ export function App(): React.JSX.Element {
         sessions={sessions}
         onOpenSession={(id) => {
           setPanelOpen(false);
-          setScreen("recap");
+          goToScreen("recap");
         }}
         onLogin={handleLogin}
         onLogout={handleLogout}

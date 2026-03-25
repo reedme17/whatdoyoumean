@@ -5,7 +5,7 @@
 
 import React, { useState } from "react";
 import type { SessionSummary } from "./ExpandPanel.js";
-import { base, colors } from "../styles.js";
+import { Input } from "./ui/input.js";
 
 interface Props {
   sessions: SessionSummary[];
@@ -24,11 +24,10 @@ export function HistoryView({ sessions, onOpenSession }: Props): React.JSX.Eleme
     : sessions;
 
   return (
-    <div style={{ padding: "0 0 12px 0" }} role="region" aria-label="Session history">
+    <div className="pb-3" role="region" aria-label="Session history">
       {/* Search */}
-      <div style={{ padding: "8px 16px" }}>
-        <input
-          style={base.input}
+      <div className="px-4 py-2">
+        <Input
           placeholder="Search sessions..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -38,7 +37,7 @@ export function HistoryView({ sessions, onOpenSession }: Props): React.JSX.Eleme
 
       {/* Session list */}
       {filtered.length === 0 && (
-        <div style={{ padding: "16px", fontSize: 13, color: colors.muted, textAlign: "center" }}>
+        <div className="p-4 text-sm text-muted text-center">
           {search ? "No matching sessions." : "No sessions yet."}
         </div>
       )}
@@ -46,24 +45,14 @@ export function HistoryView({ sessions, onOpenSession }: Props): React.JSX.Eleme
       {filtered.map((session) => (
         <button
           key={session.id}
-          style={{
-            display: "block",
-            width: "100%",
-            textAlign: "left",
-            padding: "10px 16px",
-            border: "none",
-            borderBottom: `1px solid ${colors.border}`,
-            background: "transparent",
-            cursor: "pointer",
-            fontFamily: "inherit",
-          }}
+          className="block w-full text-left px-4 py-2.5 border-b border-border bg-transparent cursor-pointer hover:bg-accent font-[inherit]"
           onClick={() => onOpenSession(session.id)}
         >
-          <div style={{ fontSize: 13, fontWeight: 500 }}>
+          <div className="text-sm font-medium">
             {session.date} — {session.durationMin}min
             {session.mode === "text" && " (text mode)"}
           </div>
-          <div style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
+          <div className="text-xs text-muted mt-0.5">
             {session.topicSummary || "Untitled session"}
           </div>
         </button>

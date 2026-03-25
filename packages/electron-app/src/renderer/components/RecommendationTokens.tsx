@@ -5,7 +5,7 @@
 
 import React, { useState } from "react";
 import type { Recommendation } from "@wdym/shared";
-import { base, colors } from "../styles.js";
+import { Badge } from "./ui/badge.js";
 
 interface Props {
   recommendations: Recommendation[];
@@ -30,33 +30,23 @@ export function RecommendationTokens({ recommendations }: Props): React.JSX.Elem
     <div
       role="region"
       aria-label="Recommendations"
-      style={{
-        display: "flex",
-        flexWrap: "wrap",
-        gap: 8,
-        padding: "8px 16px",
-        borderTop: `1px solid ${colors.border}`,
-        background: colors.bg,
-      }}
+      className="flex flex-wrap gap-2 px-4 py-2 border-t border-border bg-background"
     >
-      <span style={{ fontSize: 11, color: colors.muted, alignSelf: "center" }}>
-        Recommendations
-      </span>
+      <span className="text-[11px] text-muted self-center">Recommendations</span>
       {recommendations.map((rec) => (
-        <button
+        <Badge
           key={rec.id}
-          style={{
-            ...base.badge,
-            background: copiedId === rec.id ? colors.fg : colors.bg,
-            color: copiedId === rec.id ? colors.bg : colors.fg,
-            transition: "all 0.15s",
-          }}
+          className={
+            copiedId === rec.id
+              ? "bg-foreground text-background transition-all duration-150"
+              : "transition-all duration-150"
+          }
           onClick={() => handleCopy(rec)}
           title={rec.reasoning}
           aria-label={`Copy recommendation: ${rec.text}`}
         >
           {copiedId === rec.id ? "Copied!" : rec.text}
-        </button>
+        </Badge>
       ))}
     </div>
   );

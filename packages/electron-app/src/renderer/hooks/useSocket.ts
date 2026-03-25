@@ -44,6 +44,7 @@ export function useSocket(onEvent: ServerEventHandler): UseSocketReturn {
       "recommendation:new",
       "topic:updated",
       "stt:provider_switch",
+      "pending:preview",
       "error",
       "session:state",
     ];

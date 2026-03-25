@@ -18,6 +18,8 @@ interface UseAudioCaptureOptions {
   send: (event: { type: string; [key: string]: unknown }) => void;
   /** Capture mode: "online" captures mic + system audio, "offline" captures mic only */
   mode?: "online" | "offline";
+  /** Whether to also capture system audio via desktopCapturer */
+  captureSystem?: boolean;
 }
 
 export interface UseAudioCaptureReturn {
@@ -25,6 +27,8 @@ export interface UseAudioCaptureReturn {
   stopCapture: () => void;
   isCapturing: boolean;
   error: string | null;
+  /** AnalyserNode for real-time waveform visualization */
+  analyser: AnalyserNode | null;
 }
 
 /**
@@ -98,7 +102,22 @@ function downsample(buffer: Float32Array, fromRate: number, toRate: number): Flo
   return result;
 }
 
-export function useAudioCapture({ send, mode = "offline" }: UseAudioCaptureOptions): UseAudioCaptureReturn {
+/** RMS energy threshold — below this, the chunk is considered silence */
+const SILENCE_RMS_THRESHOLD = 0.005;
+
+/**
+ * Calculate RMS (root mean square) energy of audio samples.
+ * Returns a value between 0 (silence) and 1 (max volume).
+ */
+function calculateRMS(samples: Float32Array): number {
+  let sum = 0;
+  for (let i = 0; i < samples.length; i++) {
+    sum += samples[i] * samples[i];
+  }
+  return Math.sqrt(sum / samples.length);
+}
+
+export function useAudioCapture({ send, mode = "offline", captureSystem = false }: UseAudioCaptureOptions): UseAudioCaptureReturn {
   const [isCapturing, setIsCapturing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -106,6 +125,7 @@ export function useAudioCapture({ send, mode = "offline" }: UseAudioCaptureOptio
   const systemStreamRef = useRef<MediaStream | null>(null);
   const contextRef = useRef<AudioContext | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
   const accumulatorRef = useRef<Float32Array[]>([]);
   const accumulatedSamplesRef = useRef(0);
   const capturingRef = useRef(false);
@@ -131,6 +151,13 @@ export function useAudioCapture({ send, mode = "offline" }: UseAudioCaptureOptio
     const ctx = contextRef.current;
     const sourceSampleRate = ctx?.sampleRate ?? 44100;
     const downsampled = downsample(merged, sourceSampleRate, TARGET_SAMPLE_RATE);
+
+    // Skip silent chunks to avoid Whisper hallucinations ("Thank you", "You", etc.)
+    const rms = calculateRMS(downsampled);
+    if (rms < SILENCE_RMS_THRESHOLD) {
+      console.log(`[AudioCapture] Silent chunk (RMS=${rms.toFixed(5)}) — skipping`);
+      return;
+    }
 
     // Encode as WAV base64
     const audioBase64 = encodeWavBase64(downsampled, TARGET_SAMPLE_RATE);
@@ -172,12 +199,11 @@ export function useAudioCapture({ send, mode = "offline" }: UseAudioCaptureOptio
       });
       streamRef.current = micStream;
 
-      // 2. Try to get system audio (online mode only)
+      // 2. Try to get system audio (only when user explicitly enables it)
       let systemStream: MediaStream | null = null;
-      if (mode === "online" && (window as any).electronAPI?.getDesktopSources) {
+      if (captureSystem && (window as any).electronAPI?.getDesktopSources) {
         try {
           const sources = await (window as any).electronAPI.getDesktopSources();
-          // Pick the first screen source (usually "Entire Screen")
           const screenSource = sources.find((s: { name: string }) =>
             s.name.includes("Entire Screen") || s.name.includes("Screen")
           ) ?? sources[0];
@@ -200,35 +226,46 @@ export function useAudioCapture({ send, mode = "offline" }: UseAudioCaptureOptio
                 },
               } as any,
             });
-            // Stop the video track — we only need audio
             systemStream.getVideoTracks().forEach((t) => t.stop());
             systemStreamRef.current = systemStream;
             console.log("[AudioCapture] System audio captured via desktopCapturer");
           }
         } catch (sysErr) {
-          console.warn("[AudioCapture] System audio capture failed (may need Screen Recording permission):", sysErr);
-          // Continue with mic only
+          console.warn("[AudioCapture] System audio capture failed:", sysErr);
         }
       }
 
       // 3. Set up AudioContext and mix streams
-      const audioContext = new AudioContext({ sampleRate: undefined });
+      // Use default sample rate (let the browser pick the best one)
+      const audioContext = new AudioContext();
       contextRef.current = audioContext;
+
+      // Wait for AudioContext to be running (may be suspended on some systems)
+      if (audioContext.state === "suspended") {
+        await audioContext.resume();
+      }
 
       const micSource = audioContext.createMediaStreamSource(micStream);
 
       // If we have system audio, mix it with mic
       let mixedSource: AudioNode;
       if (systemStream && systemStream.getAudioTracks().length > 0) {
-        const sysSource = audioContext.createMediaStreamSource(systemStream);
-        const merger = audioContext.createChannelMerger(2);
-        micSource.connect(merger, 0, 0);
-        sysSource.connect(merger, 0, 1);
-        // Convert stereo merger output to mono
-        const monoMixer = audioContext.createGain();
-        merger.connect(monoMixer);
-        mixedSource = monoMixer;
-        console.log("[AudioCapture] Mixing mic + system audio");
+        try {
+          const sysSource = audioContext.createMediaStreamSource(systemStream);
+          const merger = audioContext.createChannelMerger(2);
+          micSource.connect(merger, 0, 0);
+          sysSource.connect(merger, 0, 1);
+          const monoMixer = audioContext.createGain();
+          merger.connect(monoMixer);
+          mixedSource = monoMixer;
+          console.log("[AudioCapture] Mixing mic + system audio");
+        } catch (mixErr) {
+          console.warn("[AudioCapture] Failed to mix system audio, using mic only:", mixErr);
+          // Clean up system stream
+          systemStream.getTracks().forEach((t) => t.stop());
+          systemStreamRef.current = null;
+          mixedSource = micSource;
+        }
       } else {
         mixedSource = micSource;
         console.log("[AudioCapture] Mic only (no system audio)");
@@ -236,6 +273,13 @@ export function useAudioCapture({ send, mode = "offline" }: UseAudioCaptureOptio
 
       const processor = audioContext.createScriptProcessor(4096, 1, 1);
       processorRef.current = processor;
+
+      // Create analyser for waveform visualization
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.8;
+      analyserRef.current = analyser;
+      mixedSource.connect(analyser);
 
       const samplesPerChunk = audioContext.sampleRate * CHUNK_DURATION_SEC;
 
@@ -281,6 +325,9 @@ export function useAudioCapture({ send, mode = "offline" }: UseAudioCaptureOptio
     processorRef.current?.disconnect();
     processorRef.current = null;
 
+    analyserRef.current?.disconnect();
+    analyserRef.current = null;
+
     if (contextRef.current?.state !== "closed") {
       contextRef.current?.close();
     }
@@ -297,5 +344,5 @@ export function useAudioCapture({ send, mode = "offline" }: UseAudioCaptureOptio
     console.log("[AudioCapture] Stopped");
   }, [flushChunk]);
 
-  return { startCapture, stopCapture, isCapturing, error };
+  return { startCapture, stopCapture, isCapturing, error, analyser: analyserRef.current };
 }

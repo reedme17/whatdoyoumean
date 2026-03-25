@@ -8,7 +8,9 @@ import React from "react";
 import type { CoreMeaningCard, Recommendation, Bookmark } from "@wdym/shared";
 import { CoreMeaningCardView } from "./CoreMeaningCard.js";
 import { RecommendationTokens } from "./RecommendationTokens.js";
-import { base, colors } from "../styles.js";
+import { Button } from "./ui/button.js";
+import { Badge } from "./ui/badge.js";
+import { Separator } from "./ui/separator.js";
 
 interface Props {
   cards: CoreMeaningCard[];
@@ -30,22 +32,23 @@ export function RecapScreen({
   onEditCard,
 }: Props): React.JSX.Element {
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: colors.bg }} role="main" aria-label="Session recap">
+    <div className="flex flex-col h-full bg-background" role="main" aria-label="Session recap">
       {/* Top bar */}
-      <div style={base.topBar}>
-        <span style={base.heading}>Session Recap</span>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button style={base.btnOutline} onClick={onExport} title="Export (⌘E)" aria-label="Export session">
+      <div className="flex items-center justify-between px-5 py-3">
+        <span className="text-base font-semibold">Session Recap</span>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={onExport} title="Export (⌘E)" aria-label="Export session">
             Export
-          </button>
-          <button style={base.btnGhost} onClick={onClose} title="Close" aria-label="Close recap">
+          </Button>
+          <Button variant="ghost" onClick={onClose} title="Close" aria-label="Close recap">
             ✕
-          </button>
+          </Button>
         </div>
       </div>
+      <Separator />
 
       {/* Cards */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px" }}>
+      <div className="flex-1 overflow-y-auto px-5 py-4">
         {cards.map((card) => (
           <CoreMeaningCardView
             key={card.id}
@@ -57,35 +60,28 @@ export function RecapScreen({
         ))}
 
         {cards.length === 0 && (
-          <div style={{ color: colors.muted, fontSize: 14, textAlign: "center", marginTop: 40 }}>
+          <div className="text-muted text-sm text-center mt-10">
             No cards in this session.
           </div>
         )}
       </div>
 
-      {/* Recommendations */}
-      <RecommendationTokens recommendations={recommendations} />
-
       {/* Flagged moments */}
       {bookmarks.length > 0 && (
-        <div
-          style={{
-            padding: "10px 20px",
-            borderTop: `1px solid ${colors.border}`,
-            fontSize: 12,
-            color: colors.muted,
-          }}
-        >
-          <span style={{ fontWeight: 600 }}>⚑ Flagged moments</span>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6 }}>
-            {bookmarks.map((bm) => (
-              <span key={bm.id} style={base.badge}>
-                {formatTimestamp(bm.timestamp)}
-                {bm.note ? ` — ${bm.note}` : ""}
-              </span>
-            ))}
+        <>
+          <Separator />
+          <div className="px-5 py-2.5 text-xs text-muted">
+            <span className="font-semibold">⚑ Flagged moments</span>
+            <div className="flex flex-wrap gap-2 mt-1.5">
+              {bookmarks.map((bm) => (
+                <Badge key={bm.id}>
+                  {formatTimestamp(bm.timestamp)}
+                  {bm.note ? ` — ${bm.note}` : ""}
+                </Badge>
+              ))}
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

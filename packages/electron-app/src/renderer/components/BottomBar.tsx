@@ -1,67 +1,42 @@
 /**
  * BottomBar — session control bar for live sessions.
- * Left: "● Listening..." status
+ * Left: waveform visualization
  * Center: Flag button (⚑)
  * Right: Stop button (■)
  */
 
 import React from "react";
-import { base, colors } from "../styles.js";
+import { Button } from "./ui/button.js";
+import { Waveform } from "./Waveform.js";
 
 interface Props {
   onFlag: () => void;
   onStop: () => void;
+  analyser?: AnalyserNode | null;
+  isCapturing?: boolean;
 }
 
-export function BottomBar({ onFlag, onStop }: Props): React.JSX.Element {
+export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false }: Props): React.JSX.Element {
   return (
     <div
       role="toolbar"
       aria-label="Session controls"
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "10px 20px",
-        borderTop: `1px solid ${colors.border}`,
-        background: colors.bg,
-      }}
+      className="flex items-center justify-between px-5 py-2.5 border-t border-border bg-background"
     >
-      {/* Left: listening indicator */}
-      <div role="status" aria-live="polite" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-        <span
-          aria-hidden="true"
-          style={{
-            display: "inline-block",
-            width: 8,
-            height: 8,
-            borderRadius: "50%",
-            background: colors.fg,
-            animation: "pulse 2s infinite",
-          }}
-        />
-        <span style={{ color: colors.muted }}>Listening...</span>
+      {/* Left: waveform */}
+      <div role="status" aria-live="polite" className="flex items-center gap-2">
+        <Waveform analyser={analyser} isCapturing={isCapturing} />
       </div>
 
       {/* Center: flag */}
-      <button
-        style={{ ...base.btnOutline, padding: "8px 16px", fontSize: 16 }}
-        onClick={onFlag}
-        title="Flag this moment (⌘B)"
-        aria-label="Flag this moment"
-      >
+      <Button variant="outline" className="px-4 py-2 text-base" onClick={onFlag} title="Flag this moment (⌘B)" aria-label="Flag this moment">
         ⚑
-      </button>
+      </Button>
 
       {/* Right: stop */}
-      <button
-        style={{ ...base.btn, padding: "8px 16px", fontSize: 14 }}
-        onClick={onStop}
-        title="Stop session (⌘⇧S)"
-        aria-label="Stop session"
-      >
+      <Button className="px-4 py-2 text-sm" onClick={onStop} title="Stop session (⌘⇧S)" aria-label="Stop session">
         ■ Stop
-      </button>
+      </Button>
     </div>
   );
 }

@@ -126,7 +126,17 @@ audioCaptureEngine.on("noise-warning", (level) => {
 
 // ── App lifecycle ──────────────────────────────────────────────────────────────
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // Request microphone permission on macOS before creating window
+  if (process.platform === "darwin") {
+    const micStatus = systemPreferences.getMediaAccessStatus("microphone");
+    console.log("[Main] Microphone permission status:", micStatus);
+    if (micStatus !== "granted") {
+      const granted = await systemPreferences.askForMediaAccess("microphone");
+      console.log("[Main] Microphone permission granted:", granted);
+    }
+  }
+
   registerIpcHandlers();
   createWindow();
 

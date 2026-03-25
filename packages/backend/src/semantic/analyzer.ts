@@ -185,6 +185,8 @@ export class SemanticAnalyzer {
 
 const SYSTEM_PROMPT = `You are a semantic analysis engine. Given a transcript segment and conversation context, extract the core meaning in a concise statement.
 
+CRITICAL: The "content" field MUST be in the SAME LANGUAGE as the transcript segment. If the input is Chinese, respond in Chinese. If English, respond in English. If mixed, use the dominant language.
+
 Respond ONLY with valid JSON in this exact format:
 {
   "content": "<core meaning in ≤30 English words or ≤50 Chinese characters>",

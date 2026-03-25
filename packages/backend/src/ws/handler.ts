@@ -40,6 +40,14 @@ interface SocketSessionState {
   transcripts: TranscriptSegment[];
   transcriptionEngine: TranscriptionEngine;
   languageDetector: LanguageDetector;
+  /** Accumulated transcript text waiting to be finalized into a card */
+  pendingText: string;
+  /** Accumulated transcript segments for the pending text */
+  pendingSegments: TranscriptSegment[];
+  /** Timer for silence detection — fires after 5s of no new audio */
+  silenceTimer: ReturnType<typeof setTimeout> | null;
+  /** Timestamp of last received audio chunk */
+  lastAudioTime: number;
 }
 
 /**
@@ -80,6 +88,10 @@ export function setupWebSocketHandlers(
       transcripts: [],
       transcriptionEngine: new TranscriptionEngine(),
       languageDetector: new LanguageDetector(),
+      pendingText: "",
+      pendingSegments: [],
+      silenceTimer: null,
+      lastAudioTime: 0,
     };
 
     // Wire transcription engine callbacks
@@ -147,9 +159,21 @@ export function setupWebSocketHandlers(
       }
     });
 
-    socket.on("session:end", () => {
+    socket.on("session:end", async () => {
       try {
         if (!state.sessionId) throw new Error("No active session");
+        // Cancel silence timer
+        if (state.silenceTimer) {
+          clearTimeout(state.silenceTimer);
+          state.silenceTimer = null;
+        }
+        // Flush any pending text into a card before ending
+        if (state.pendingText.trim()) {
+          await finalizePendingText(
+            socket, state,
+            semanticAnalyzer, recommendationEngine, visualizationEngine,
+          );
+        }
         sessionManager.end(state.sessionId);
         state.transcriptionEngine.stopTranscription();
         emitServerEvent(socket, { type: "session:state", state: "ended" });
@@ -220,6 +244,10 @@ export function setupWebSocketHandlers(
     });
 
     socket.on("disconnect", () => {
+      if (state.silenceTimer) {
+        clearTimeout(state.silenceTimer);
+        state.silenceTimer = null;
+      }
       if (state.sessionId) {
         try {
           state.transcriptionEngine.stopTranscription();
@@ -236,6 +264,9 @@ export function setupWebSocketHandlers(
 /** Shared Groq Whisper provider instance for audio chunk transcription */
 const groqWhisper = new GroqWhisperProvider();
 
+/** Silence duration (ms) before finalizing accumulated text into a card */
+const SILENCE_THRESHOLD_MS = 5000;
+
 async function processAudioChunk(
   socket: Socket,
   state: SocketSessionState,
@@ -247,21 +278,19 @@ async function processAudioChunk(
   try {
     console.log(`[WS] processAudioChunk: ${Math.round(audioBase64.length / 1024)}KB base64`);
 
-    // Transcribe via Groq Whisper — omit language to let Whisper auto-detect (supports Chinese + English)
     const { text, latencyMs } = await groqWhisper.transcribeBase64Wav(audioBase64);
 
     if (!text || text.trim().length === 0) {
-      console.log("[WS] Empty transcription — skipping");
+      console.log("[WS] Empty transcription — silence detected");
+      // Don't reset the silence timer — let it fire if no more audio comes
       return;
     }
 
     console.log(`[WS] Groq transcription (${latencyMs}ms): "${text.slice(0, 80)}"`);
 
-    // Detect language from transcribed text
     const langResult = state.languageDetector.detectFromText(text);
     console.log(`[WS] Detected language: ${langResult.primaryLanguage}`);
 
-    // Create a TranscriptSegment from the transcription
     const segment: TranscriptSegment = {
       id: `groq_audio_${Date.now()}`,
       sessionId: state.sessionId!,
@@ -279,15 +308,71 @@ async function processAudioChunk(
     state.transcripts.push(segment);
     emitServerEvent(socket, { type: "transcript:final", segment });
 
-    // Run through the full semantic pipeline
-    await processFinalTranscript(
-      socket, state, segment,
-      analyzer, recommender, visualizer,
-    );
+    // Accumulate text instead of immediately creating a card
+    state.pendingText += (state.pendingText ? " " : "") + text.trim();
+    state.pendingSegments.push(segment);
+    state.lastAudioTime = Date.now();
+
+    // Send preview of accumulated text to frontend
+    emitServerEvent(socket, { type: "pending:preview", text: state.pendingText });
+
+    // Reset silence timer — will fire after 5s of no new transcription
+    if (state.silenceTimer) {
+      clearTimeout(state.silenceTimer);
+    }
+    state.silenceTimer = setTimeout(() => {
+      finalizePendingText(socket, state, analyzer, recommender, visualizer);
+    }, SILENCE_THRESHOLD_MS);
+
+    console.log(`[WS] Accumulated pending text (${state.pendingText.length} chars), waiting for silence...`);
   } catch (err) {
     console.error("[WS] Audio chunk processing error:", err);
     emitError(socket, "stt", String(err), true);
   }
+}
+
+/**
+ * Finalize accumulated pending text into a card.
+ * Called when silence is detected (5s no audio) or session ends.
+ */
+async function finalizePendingText(
+  socket: Socket,
+  state: SocketSessionState,
+  analyzer: SemanticAnalyzer,
+  recommender: RecommendationEngine,
+  visualizer: VisualizationEngine,
+): Promise<void> {
+  if (!state.pendingText.trim()) return;
+
+  const text = state.pendingText;
+  const segments = [...state.pendingSegments];
+
+  // Clear pending state
+  state.pendingText = "";
+  state.pendingSegments = [];
+  state.silenceTimer = null;
+
+  console.log(`[WS] Silence detected — finalizing ${text.length} chars into card`);
+
+  // Create a merged segment representing the full utterance
+  const mergedSegment: TranscriptSegment = {
+    id: `merged_${Date.now()}`,
+    sessionId: state.sessionId!,
+    text,
+    languageCode: segments[0]?.languageCode ?? "en",
+    speakerId: "user",
+    startTime: segments[0]?.startTime ?? Date.now(),
+    endTime: segments[segments.length - 1]?.endTime ?? Date.now(),
+    isFinal: true,
+    confidence: 0.95,
+    provider: "groq_whisper",
+    createdAt: new Date(),
+  };
+
+  await processFinalTranscript(
+    socket, state, mergedSegment,
+    analyzer, recommender, visualizer,
+  );
 }
 
 async function processFinalTranscript(
@@ -316,16 +401,9 @@ async function processFinalTranscript(
     state.cards.push(card);
     emitServerEvent(socket, { type: "card:created", card });
 
-    // Duplicate detection + merge
-    const mergeDecision = await analyzer.detectDuplicate(card, state.cards.slice(0, -1));
-    if (mergeDecision.shouldMerge && mergeDecision.targetCardId) {
-      const target = state.cards.find((c) => c.id === mergeDecision.targetCardId);
-      if (target && mergeDecision.mergedContent) {
-        target.content = mergeDecision.mergedContent;
-        target.updatedAt = new Date();
-        emitServerEvent(socket, { type: "card:updated", card: target });
-      }
-    }
+    // Duplicate detection disabled for now — it causes cards to mutate
+    // unexpectedly in recap view. Will revisit with better UX.
+    // const mergeDecision = await analyzer.detectDuplicate(card, state.cards.slice(0, -1));
 
     // Topic map update
     state.topicMap = await analyzer.updateTopicMap(card, state.topicMap);

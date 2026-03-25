@@ -44,5 +44,6 @@ export type ServerEvent =
   | { type: 'recommendation:new'; recommendations: Recommendation[] }
   | { type: 'topic:updated'; topicMap: TopicMap }
   | { type: 'stt:provider_switch'; from: string; to: string }
+  | { type: 'pending:preview'; text: string }
   | { type: 'error'; subsystem: string; message: string; recoverable: boolean }
   | { type: 'session:state'; state: 'active' | 'paused' | 'ended' };

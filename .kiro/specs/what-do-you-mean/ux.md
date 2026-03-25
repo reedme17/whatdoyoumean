@@ -31,7 +31,7 @@ The app opens directly here, no login required (guest mode):
 │                                         │
 │                                         │
 │              [ START ]                  │  ← large center button
-│                                         │
+│          🎤 Mic Only [switch]           │  ← audio source toggle
 │                                         │
 │                                         │
 │  [Text Mode]                    [≡]     │  ← bottom-left: text mode
@@ -40,6 +40,9 @@ The app opens directly here, no login required (guest mode):
 ```
 
 - **START button**: center of screen, large, works immediately in guest mode
+- **Audio source toggle**: below START button, switches between:
+  - "🎤 Mic Only" (default, stable) — captures microphone only
+  - "🎤🔊 Mic + System ⚠ experimental" — captures microphone + system audio via desktopCapturer (may have compatibility issues on some Electron versions)
 - **Text Mode**: bottom-left corner — opens text paste view, works in guest mode
 - **Expand icon (≡)**: bottom-right corner — opens side panel. In guest mode, the panel prominently shows "Sign In" at the top to unlock History, Memory, Sync, etc.
 
@@ -62,17 +65,20 @@ After pressing START, the screen becomes a full canvas:
 │  │ [rec 1] [rec 2] [rec 3]        │    │  ← floating recommendation tokens
 │  └─────────────────────────────────┘    │
 │                                         │
-│  ● Listening...    [⚑ Flag]  [■ Stop]   │  ← bottom bar
+│  ▎▌▍▎▌▍▎▌▍▎▌   [⚑ Flag]  [■ Stop]     │  ← bottom bar with waveform
 └─────────────────────────────────────────┘
 ```
 
 - **Canvas area**: full screen, auto-scrolling, displays Core_Meaning_Cards and visualizations in real-time
-  - **Card lifecycle**: while someone is speaking, the current Core_Meaning_Card updates in-place at the bottom of the canvas. When a significant pause occurs or another speaker starts talking, the current card is finalized and pushed up, and a new card begins below it. Old cards remain visible — scroll up to review them.
+  - **Card lifecycle**: audio is continuously transcribed in 4-second chunks. Transcription text accumulates on the backend. A card is finalized and pushed to the canvas when either:
+    1. **5-second silence** — no new transcription for 5 seconds means the speaker has paused, triggering card creation from all accumulated text
+    2. **Session end** — pressing Stop flushes any remaining accumulated text into a final card
+  - Future: speaker change detection (diarization) will also trigger card finalization when a different person starts speaking
   - **Speaker indicator**: each card shows a small speaker label (e.g., "Speaker 1" or user-assigned name) at the top-left. When the speaker changes, the new card visually shows the different speaker, making turn-taking clear in the stream.
   - The canvas is a vertical stream: newest content at the bottom, oldest at the top
 - **Recommendation tokens**: floating at the bottom of the canvas, above the bottom bar. Token-style buttons (shadcn Badge or Button variant). Tap to copy text. Refresh as new cards appear.
 - **Bottom bar**:
-  - Left: "● Listening..." status with subtle pulse
+  - Left: **Real-time waveform** — 20 vertical bars visualizing audio frequency data from the AnalyserNode. Bars animate when speaking, show a flat line when silent. Replaces the previous "● Listening..." text indicator.
   - Center: **Flag button (⚑)** — creates a bookmark at the current moment
   - Right: **Stop button (■)**
 - No raw transcript shown by default — only processed/extracted meaning
@@ -204,8 +210,11 @@ Tapping a session opens it in the Recap view.
 
 - Should raw transcript be visible during live session? Toggle? Separate view?
 - Topic map — when is it shown? Separate view? Part of recap? Overlay?
-- Card editing in recap — inline editing or modal?
-- Flag — should it capture a note/label, or just a timestamp marker?
+- Card editing in recap — inline editing or modal? (Currently: inline click-to-edit)
+- Flag — should it capture a note/label, or just a timestamp marker? (Currently: timestamp only)
+- Speaker diarization — how to detect speaker changes for automatic card finalization? Options: Deepgram, AssemblyAI, pyannote, or simple energy/pitch heuristics
+- System audio capture — Electron 33 + macOS has AudioContext compatibility issues with desktopCapturer. Revisit with Electron 34+ or AudioWorklet approach
+- Design system — tokens defined in `packages/shared/src/tokens.ts`, currently manually synced with `globals.css`. Automate with build script?
 
 ## 6. iOS App
 
@@ -214,4 +223,20 @@ Tapping a session opens it in the Recap view.
 ## 7. Visual Design System
 
 > Lo-fi phase: black & white only, shadcn/ui defaults.
-> Color palette, typography, iconography, animations will be defined in a future hi-fi phase.
+
+### Current Implementation
+- **Component library**: shadcn/ui (Button, Card, Badge, Input, Textarea) with Tailwind CSS v4
+- **Design tokens**: Defined in `packages/shared/src/tokens.ts` (single source of truth)
+  - Colors: semantic naming (background, foreground, primary, muted, destructive, accent, card)
+  - Typography: font family (sans/mono), sizes (xs-6xl), weights (light-bold), line heights
+  - Spacing: 4px base scale
+  - Radius: sm/md/lg/full
+  - Duration: fast/normal/slow
+  - Shadows: sm/md
+- **CSS theme**: `globals.css` `@theme` block maps tokens to CSS custom properties consumed by Tailwind utilities
+- **Utility**: `cn()` helper (clsx + tailwind-merge) for conditional class composition
+
+### Future
+- Color palette, iconography, animations will be defined in a hi-fi phase
+- Dark mode support via `@theme` variant
+- iOS SwiftUI extensions generated from the same `tokens.ts` source

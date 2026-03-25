@@ -1,13 +1,15 @@
 /**
- * ExpandPanel — slide-out right panel.
+ * ExpandPanel — slide-out right panel using Sheet component.
  * Guest mode: shows Sign In at top, locked features marked with 🔒.
  * Signed in: full access to Profile, History, Settings, Terminology, About.
  */
 
 import React, { useState } from "react";
-import { base, colors } from "../styles.js";
-import { LoginScreen } from "./LoginScreen.js";
+import { Sheet, SheetHeader, SheetContent, SheetClose } from "./ui/sheet.js";
+import { Button } from "./ui/button.js";
+import { Separator } from "./ui/separator.js";
 import { HistoryView } from "./HistoryView.js";
+import { cn } from "../lib/utils.js";
 
 export interface SessionSummary {
   id: string;
@@ -42,185 +44,130 @@ export function ExpandPanel({
 }: Props): React.JSX.Element | null {
   const [activeSection, setActiveSection] = useState<Section>("none");
 
-  if (!open) return null;
+  const toggle = (section: Section) =>
+    setActiveSection((prev) => (prev === section ? "none" : section));
 
   const menuItem = (label: string, section: Section, locked = false) => (
-    <button
-      key={section}
-      style={{
-        ...base.btnGhost,
-        width: "100%",
-        textAlign: "left",
-        padding: "12px 20px",
-        fontSize: 14,
-        fontWeight: activeSection === section ? 600 : 400,
-        color: locked ? colors.muted : activeSection === section ? colors.fg : colors.muted,
-        borderBottom: `1px solid ${colors.border}`,
-        borderRadius: 0,
-        opacity: locked ? 0.5 : 1,
-      }}
-      onClick={() => {
-        if (locked) return;
-        setActiveSection(activeSection === section ? "none" : section);
-      }}
-      disabled={locked}
-    >
-      {label}{locked ? " 🔒" : ""}
-    </button>
+    <React.Fragment key={section}>
+      <button
+        className={cn(
+          "w-full text-left px-5 py-3 text-sm bg-transparent cursor-pointer font-[inherit]",
+          locked && "opacity-50 cursor-not-allowed",
+          activeSection === section ? "font-semibold text-foreground" : "text-muted",
+          !locked && "hover:bg-accent"
+        )}
+        onClick={() => !locked && toggle(section)}
+        disabled={locked}
+      >
+        {label}{locked ? " 🔒" : ""}
+      </button>
+      <Separator />
+    </React.Fragment>
   );
 
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        role="presentation"
-        style={{
-          position: "fixed",
-          inset: 0,
-          background: "rgba(0,0,0,0.15)",
-          zIndex: 99,
-        }}
-        onClick={onClose}
-      />
+    <Sheet open={open} onClose={onClose} className="w-80" aria-label="Navigation menu">
+      <SheetHeader>
+        <span />
+        <SheetClose onClose={onClose} />
+      </SheetHeader>
 
-      {/* Panel */}
-      <div
-        role="dialog"
-        aria-label="Navigation menu"
-        style={{
-          position: "fixed",
-          top: 0,
-          right: 0,
-          bottom: 0,
-          width: 320,
-          background: colors.bg,
-          borderLeft: `1px solid ${colors.border}`,
-          zIndex: 100,
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-        }}
-      >
-        {/* Header */}
-        <div style={{ ...base.topBar, justifyContent: "flex-end" }}>
-          <button style={base.btnGhost} onClick={onClose} aria-label="Close menu">
-            ✕
-          </button>
-        </div>
-
-        {/* Menu items */}
-        <nav style={{ flex: 1, overflowY: "auto" }} aria-label="Main navigation">
-
-          {/* Guest mode: Sign In button at top */}
-          {isGuest && (
-            <>
-              <button
-                style={{
-                  ...base.btn,
-                  width: "calc(100% - 40px)",
-                  margin: "12px 20px",
-                  textAlign: "center",
-                }}
-                onClick={() => setActiveSection(activeSection === "signin" ? "none" : "signin")}
-              >
-                Sign In
-              </button>
-              {activeSection === "signin" && (
-                <div style={{ padding: "0 20px 12px" }}>
-                  <div style={{ fontSize: 12, color: colors.muted, marginBottom: 12 }}>
-                    Sign in to unlock History, Memory, Sync, and more.
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    <button style={base.btnOutline} onClick={() => { onLogin("user_apple_" + Date.now()); onClose(); }}>
-                      Sign in with Apple
-                    </button>
-                    <button style={base.btnOutline} onClick={() => { onLogin("user_google_" + Date.now()); onClose(); }}>
-                      Sign in with Google
-                    </button>
-                    <button style={{ ...base.btnGhost, fontSize: 12 }} onClick={() => { onLogin("user_email_" + Date.now()); onClose(); }}>
-                      Sign in with Email
-                    </button>
-                  </div>
+      <SheetContent aria-label="Main navigation">
+        {/* Guest mode: Sign In button at top */}
+        {isGuest && (
+          <>
+            <Button
+              className="w-[calc(100%-40px)] mx-5 my-3"
+              onClick={() => toggle("signin")}
+            >
+              Sign In
+            </Button>
+            {activeSection === "signin" && (
+              <div className="px-5 pb-3">
+                <div className="text-xs text-muted mb-3">
+                  Sign in to unlock History, Memory, Sync, and more.
                 </div>
-              )}
-            </>
-          )}
-
-          {/* Signed in: Profile */}
-          {!isGuest && menuItem("Profile", "profile")}
-          {!isGuest && activeSection === "profile" && (
-            <div style={{ padding: "12px 20px", fontSize: 13, color: colors.muted }}>
-              <div style={{ marginBottom: 8 }}>User: {userId}</div>
-              <div style={{ marginBottom: 8 }}>Sessions: {sessions.length}</div>
-              <button style={base.btnOutline} onClick={onLogout}>
-                Sign Out
-              </button>
-            </div>
-          )}
-
-          {/* History: locked in guest mode */}
-          {menuItem("History", "history", isGuest)}
-          {!isGuest && activeSection === "history" && (
-            <div style={{ maxHeight: 300, overflowY: "auto" }}>
-              <HistoryView sessions={sessions} onOpenSession={onOpenSession} />
-            </div>
-          )}
-
-          {/* Settings: available in both modes (limited in guest) */}
-          {menuItem("Settings", "settings")}
-          {activeSection === "settings" && (
-            <div style={{ padding: "12px 20px", fontSize: 13, color: colors.muted }}>
-              <div style={{ marginBottom: 8 }}>Language: English / 中文</div>
-              <div style={{ marginBottom: 8 }}>STT Mode: Auto</div>
-              {!isGuest && (
-                <>
-                  <div style={{ marginBottom: 8 }}>LLM Provider: Auto</div>
-                  <div>Memory: Enabled</div>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Terminology: locked in guest mode */}
-          {menuItem("Terminology", "terminology", isGuest)}
-          {!isGuest && activeSection === "terminology" && (
-            <div style={{ padding: "12px 20px", fontSize: 13, color: colors.muted }}>
-              No learned terms yet. Terms will appear here as you use the app.
-            </div>
-          )}
-
-          {/* About: always available */}
-          {menuItem("About", "about")}
-          {activeSection === "about" && (
-            <div style={{ padding: "12px 20px", fontSize: 13, color: colors.muted }}>
-              <div style={{ fontWeight: 600, marginBottom: 4 }}>啥意思 — What Do You Mean</div>
-              <div>Version 0.1.0</div>
-              <div style={{ marginTop: 8 }}>
-                Real-time conversation understanding tool.
+                <div className="flex flex-col gap-2">
+                  <Button variant="outline" onClick={() => { onLogin("user_apple_" + Date.now()); onClose(); }}>
+                    Sign in with Apple
+                  </Button>
+                  <Button variant="outline" onClick={() => { onLogin("user_google_" + Date.now()); onClose(); }}>
+                    Sign in with Google
+                  </Button>
+                  <Button variant="ghost" size="sm" className="text-xs" onClick={() => { onLogin("user_email_" + Date.now()); onClose(); }}>
+                    Sign in with Email
+                  </Button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+            <Separator />
+          </>
+        )}
 
-          {/* Signed in: Sign Out at bottom */}
-          {!isGuest && (
+        {/* Signed in: Profile */}
+        {!isGuest && menuItem("Profile", "profile")}
+        {!isGuest && activeSection === "profile" && (
+          <div className="px-5 py-3 text-sm text-muted">
+            <div className="mb-2">User: {userId}</div>
+            <div className="mb-2">Sessions: {sessions.length}</div>
+            <Button variant="outline" onClick={onLogout}>Sign Out</Button>
+          </div>
+        )}
+
+        {/* History: locked in guest mode */}
+        {menuItem("History", "history", isGuest)}
+        {!isGuest && activeSection === "history" && (
+          <div className="max-h-[300px] overflow-y-auto">
+            <HistoryView sessions={sessions} onOpenSession={onOpenSession} />
+          </div>
+        )}
+
+        {/* Settings */}
+        {menuItem("Settings", "settings")}
+        {activeSection === "settings" && (
+          <div className="px-5 py-3 text-sm text-muted">
+            <div className="mb-2">Language: English / 中文</div>
+            <div className="mb-2">STT Mode: Auto</div>
+            {!isGuest && (
+              <>
+                <div className="mb-2">LLM Provider: Auto</div>
+                <div>Memory: Enabled</div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Terminology: locked in guest mode */}
+        {menuItem("Terminology", "terminology", isGuest)}
+        {!isGuest && activeSection === "terminology" && (
+          <div className="px-5 py-3 text-sm text-muted">
+            No learned terms yet. Terms will appear here as you use the app.
+          </div>
+        )}
+
+        {/* About */}
+        {menuItem("About", "about")}
+        {activeSection === "about" && (
+          <div className="px-5 py-3 text-sm text-muted">
+            <div className="font-semibold mb-1">啥意思 — What Do You Mean</div>
+            <div>Version 0.1.0</div>
+            <div className="mt-2">Real-time conversation understanding tool.</div>
+          </div>
+        )}
+
+        {/* Signed in: Sign Out at bottom */}
+        {!isGuest && (
+          <>
             <button
-              style={{
-                ...base.btnGhost,
-                width: "100%",
-                textAlign: "left",
-                padding: "12px 20px",
-                fontSize: 14,
-                color: colors.muted,
-                borderBottom: `1px solid ${colors.border}`,
-                borderRadius: 0,
-              }}
+              className="w-full text-left px-5 py-3 text-sm text-muted bg-transparent cursor-pointer hover:bg-accent font-[inherit]"
               onClick={onLogout}
             >
               Sign Out
             </button>
-          )}
-        </nav>
-      </div>
-    </>
+            <Separator />
+          </>
+        )}
+      </SheetContent>
+    </Sheet>
   );
 }

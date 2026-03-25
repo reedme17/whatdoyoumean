@@ -5,26 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:3000 http://localhost:3001 ws://localhost:3001 http://127.0.0.1:3000 http://127.0.0.1:3001 ws://127.0.0.1:3001" />
     <title>啥意思</title>
-    <style>
-      * { margin: 0; padding: 0; box-sizing: border-box; }
-      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; background: #fff; color: #000; }
-      #root { width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; }
-      /* Draggable title bar region for hiddenInset style */
-      .titlebar-drag {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 38px;
-        -webkit-app-region: drag;
-        z-index: 9999;
-        pointer-events: none;
-      }
-      /* Make buttons inside the drag region clickable */
-      button, a, input, textarea, select, [role="button"] {
-        -webkit-app-region: no-drag;
-      }
-    </style>
+    <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <div class="titlebar-drag"></div>

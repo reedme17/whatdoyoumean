@@ -5,11 +5,10 @@
  */
 
 import React, { useRef, useEffect, useState, useCallback } from "react";
-import type { CoreMeaningCard, Recommendation, Bookmark } from "@wdym/shared";
+import type { CoreMeaningCard, Recommendation } from "@wdym/shared";
 import { CoreMeaningCardView } from "./CoreMeaningCard.js";
 import { RecommendationTokens } from "./RecommendationTokens.js";
 import { BottomBar } from "./BottomBar.js";
-import { colors } from "../styles.js";
 
 interface Props {
   cards: CoreMeaningCard[];
@@ -18,8 +17,10 @@ interface Props {
   speakers: Map<string, string>;
   isCapturing?: boolean;
   audioError?: string | null;
+  analyser?: AnalyserNode | null;
   onFlag: () => void;
   onStop: () => void;
+  pendingPreview?: string;
 }
 
 export function LiveSession({
@@ -29,20 +30,20 @@ export function LiveSession({
   speakers,
   isCapturing = false,
   audioError = null,
+  analyser = null,
   onFlag,
   onStop,
+  pendingPreview = "",
 }: Props): React.JSX.Element {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
 
-  // Auto-scroll to bottom when new cards arrive
   useEffect(() => {
     if (autoScroll && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [cards, currentCard, autoScroll]);
 
-  // Pause auto-scroll when user scrolls up
   const handleScroll = useCallback(() => {
     if (!scrollRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
@@ -51,14 +52,12 @@ export function LiveSession({
   }, []);
 
   const getSpeakerName = (card: CoreMeaningCard) => {
-    // Derive speaker from first source segment's speaker
-    // For now use a simple mapping
     const segId = card.sourceSegmentIds[0];
     return speakers.get(segId ?? "") ?? "Speaker";
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: colors.bg }} role="main" aria-label="Live session">
+    <div className="flex flex-col h-full bg-background" role="main" aria-label="Live session">
       {/* Canvas area */}
       <div
         ref={scrollRef}
@@ -66,59 +65,33 @@ export function LiveSession({
         role="log"
         aria-live="polite"
         aria-label="Conversation flow"
-        style={{
-          flex: 1,
-          overflowY: "auto",
-          padding: "16px 20px",
-        }}
+        className="flex-1 overflow-y-auto px-5 py-4"
       >
-        {/* Finalized cards */}
         {cards.map((card) => (
-          <CoreMeaningCardView
-            key={card.id}
-            card={card}
-            speakerName={getSpeakerName(card)}
-          />
+          <CoreMeaningCardView key={card.id} card={card} speakerName={getSpeakerName(card)} />
         ))}
 
-        {/* Current (in-progress) card */}
         {currentCard && (
-          <CoreMeaningCardView
-            card={currentCard}
-            speakerName={getSpeakerName(currentCard)}
-            isCurrent
-          />
+          <CoreMeaningCardView card={currentCard} speakerName={getSpeakerName(currentCard)} isCurrent />
         )}
 
-        {/* Empty state */}
-        {cards.length === 0 && !currentCard && (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              height: "100%",
-              color: colors.muted,
-              fontSize: 14,
-              gap: 8,
-            }}
-          >
+        {/* Pending text preview — shows accumulated transcript before card is finalized */}
+        {pendingPreview && (
+          <div className="px-4 py-3 mb-2 rounded-lg border border-dashed border-border text-sm text-muted opacity-70 italic">
+            {pendingPreview}
+          </div>
+        )}
+
+        {cards.length === 0 && !currentCard && !pendingPreview && (
+          <div className="flex flex-col items-center justify-center h-full text-muted text-sm gap-2">
             {audioError ? (
               <>
-                <span style={{ color: "#dc2626" }}>⚠ Mic error: {audioError}</span>
+                <span className="text-destructive">⚠ Mic error: {audioError}</span>
                 <span>Waiting for speech...</span>
               </>
             ) : isCapturing ? (
               <>
-                <span style={{
-                  display: "inline-block",
-                  width: 10,
-                  height: 10,
-                  borderRadius: "50%",
-                  background: "#dc2626",
-                  animation: "pulse 1.5s infinite",
-                }} />
+                <span className="inline-block w-2.5 h-2.5 rounded-full bg-destructive animate-pulse" />
                 <span>Listening... speak into your microphone</span>
               </>
             ) : (
@@ -128,11 +101,8 @@ export function LiveSession({
         )}
       </div>
 
-      {/* Recommendation tokens */}
       <RecommendationTokens recommendations={recommendations} />
-
-      {/* Bottom bar */}
-      <BottomBar onFlag={onFlag} onStop={onStop} />
+      <BottomBar onFlag={onFlag} onStop={onStop} analyser={analyser} isCapturing={isCapturing} />
     </div>
   );
 }

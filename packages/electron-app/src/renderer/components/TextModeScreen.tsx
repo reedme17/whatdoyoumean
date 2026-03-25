@@ -6,12 +6,13 @@
 import React, { useState } from "react";
 import type { CoreMeaningCard, Recommendation } from "@wdym/shared";
 import { RecapScreen } from "./RecapScreen.js";
-import { base, colors } from "../styles.js";
+import { Button } from "./ui/button.js";
+import { Textarea } from "./ui/textarea.js";
+import { Separator } from "./ui/separator.js";
 
 interface Props {
   onAnalyze: (text: string) => void;
   onClose: () => void;
-  /** Results populated after analysis completes */
   cards: CoreMeaningCard[];
   recommendations: Recommendation[];
   analyzing: boolean;
@@ -35,7 +36,6 @@ export function TextModeScreen({
         bookmarks={[]}
         speakers={new Map()}
         onExport={() => {
-          // Export as markdown — simplified for now
           const md = cards.map((c) => `- **[${c.category}]** ${c.content}`).join("\n");
           navigator.clipboard.writeText(md);
         }}
@@ -46,25 +46,20 @@ export function TextModeScreen({
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: colors.bg }} role="main" aria-label="Text analysis mode">
+    <div className="flex flex-col h-full bg-background" role="main" aria-label="Text analysis mode">
       {/* Top bar */}
-      <div style={base.topBar}>
-        <span style={base.heading}>Text Mode</span>
-        <button style={base.btnGhost} onClick={onClose} aria-label="Close text mode">
+      <div className="flex items-center justify-between px-5 py-3">
+        <span className="text-base font-semibold">Text Mode</span>
+        <Button variant="ghost" onClick={onClose} aria-label="Close text mode">
           ✕
-        </button>
+        </Button>
       </div>
+      <Separator />
 
       {/* Textarea */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "24px 20px", gap: 16 }}>
-        <textarea
-          style={{
-            ...base.textarea,
-            flex: 1,
-            minHeight: 200,
-            fontSize: 15,
-            lineHeight: 1.6,
-          }}
+      <div className="flex-1 flex flex-col px-5 py-6 gap-4">
+        <Textarea
+          className="flex-1 min-h-[200px] text-[15px] leading-relaxed"
           placeholder="Paste or type text here..."
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -72,22 +67,18 @@ export function TextModeScreen({
           aria-label="Text input for analysis"
         />
 
-        <div style={{ display: "flex", justifyContent: "center" }}>
-          <button
-            style={{
-              ...base.btn,
-              fontSize: 16,
-              padding: "12px 40px",
-              opacity: !text.trim() || analyzing ? 0.5 : 1,
-            }}
+        <div className="flex justify-center">
+          <Button
+            size="lg"
+            className="px-10"
             onClick={() => text.trim() && onAnalyze(text)}
             disabled={!text.trim() || analyzing}
           >
             {analyzing ? "Analyzing..." : "Analyze"}
-          </button>
+          </Button>
         </div>
 
-        <div style={{ textAlign: "center", fontSize: 12, color: colors.muted }}>
+        <div className="text-center text-xs text-muted">
           Supports Chinese, English, and mixed-language text (up to 5000 characters)
         </div>
       </div>

@@ -4,7 +4,7 @@
  */
 
 import React from "react";
-import { base, colors } from "../styles.js";
+import { Button } from "./ui/button.js";
 
 interface Props {
   onLogin: (userId: string) => void;
@@ -12,34 +12,28 @@ interface Props {
 
 export function LoginScreen({ onLogin }: Props): React.JSX.Element {
   return (
-    <div style={base.screen} role="main" aria-label="Login">
-      <div style={base.center}>
-        <h1 style={{ fontSize: 56, fontWeight: 300, marginBottom: 8 }}>啥意思</h1>
-        <p style={{ fontSize: 13, color: colors.muted, marginBottom: 40 }}>
-          What Do You Mean
-        </p>
+    <div className="flex flex-col w-full h-full bg-background text-foreground" role="main" aria-label="Login">
+      <div className="flex flex-col items-center justify-center flex-1">
+        <h1 className="text-6xl font-light mb-2">啥意思</h1>
+        <p className="text-sm text-muted mb-10">What Do You Mean</p>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 12, width: 260 }} role="group" aria-label="Sign in options">
-          <button
-            style={base.btn}
-            onClick={() => onLogin("user_apple_" + Date.now())}
-          >
+        <div className="flex flex-col gap-3 w-[260px]" role="group" aria-label="Sign in options">
+          <Button onClick={() => onLogin("user_apple_" + Date.now())}>
             Sign in with Apple
-          </button>
-          <button
-            style={base.btnOutline}
-            onClick={() => onLogin("user_google_" + Date.now())}
-          >
+          </Button>
+          <Button variant="outline" onClick={() => onLogin("user_google_" + Date.now())}>
             Sign in with Google
-          </button>
+          </Button>
         </div>
 
-        <button
-          style={{ ...base.btnGhost, marginTop: 16, fontSize: 12 }}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="mt-4 text-xs"
           onClick={() => onLogin("user_email_" + Date.now())}
         >
           Sign in with Email
-        </button>
+        </Button>
       </div>
     </div>
   );
