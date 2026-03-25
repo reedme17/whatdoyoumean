@@ -224,8 +224,15 @@ function buildAnalysisPrompt(
   existingCards: string,
   topics: string,
 ): string {
+  const hasChinese = /[\u4e00-\u9fff]/.test(segment.text);
+  const langHint = hasChinese
+    ? "⚠ The transcript is in Chinese. The \"content\" field MUST be in Chinese (中文)."
+    : "⚠ The transcript is in English. The \"content\" field MUST be in English.";
+
   return `Transcript segment (${segment.languageCode}):
 "${segment.text}"
+
+${langHint}
 
 Speaker: ${segment.speakerId}
 

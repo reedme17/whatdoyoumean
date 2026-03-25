@@ -22,8 +22,9 @@ import { LiveSession } from "./components/LiveSession.js";
 import { RecapScreen } from "./components/RecapScreen.js";
 import { TextModeScreen } from "./components/TextModeScreen.js";
 import { ExpandPanel, type SessionSummary } from "./components/ExpandPanel.js";
+import { Onboarding } from "./components/Onboarding.js";
 
-type Screen = "home" | "live" | "recap" | "text" | "processing";
+type Screen = "onboarding" | "home" | "live" | "recap" | "text" | "processing";
 
 /** Minimal ElectronAPI type for window.electronAPI */
 interface ElectronAPI {
@@ -41,8 +42,8 @@ declare global {
 
 export function App(): React.JSX.Element {
   // ── Navigation state ──
-  const [screen, setScreen] = useState<Screen>("home");
-  const screenRef = useRef<Screen>("home");
+  const [screen, setScreen] = useState<Screen>("onboarding");
+  const screenRef = useRef<Screen>("onboarding");
   const [userId, setUserId] = useState<string | null>(null);
   const isGuest = userId === null;
 
@@ -357,6 +358,10 @@ export function App(): React.JSX.Element {
 
   return (
     <div className="w-full h-full relative">
+      {screen === "onboarding" && (
+        <Onboarding onComplete={() => goToScreen("home")} />
+      )}
+
       {screen === "home" && (
         <HomeScreen
           onStart={handleStart}
@@ -386,9 +391,9 @@ export function App(): React.JSX.Element {
       )}
 
       {screen === "processing" && (
-        <div className="flex flex-col items-center justify-center h-full bg-background text-foreground gap-3">
-          <div className="w-5 h-5 rounded-full border-2 border-foreground border-t-transparent animate-spin" />
-          <span className="text-sm text-muted">Processing...</span>
+        <div className="flex flex-col items-center justify-center h-full bg-background text-foreground gap-4">
+          <span className="font-serif italic text-lg text-muted">Processing...</span>
+          <div className="h-px bg-border overflow-hidden" style={{ animation: "expandLine 2s ease-in-out infinite" }} />
         </div>
       )}
 

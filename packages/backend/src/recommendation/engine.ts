@@ -193,6 +193,12 @@ function buildRecommendationPrompt(
   memoryHint: string,
   previousTexts: string[],
 ): string {
+  // Detect language from card content for explicit hint
+  const hasChinese = /[\u4e00-\u9fff]/.test(card.content);
+  const langHint = hasChinese
+    ? "\n⚠ LANGUAGE: The card is in Chinese. ALL recommendation text MUST be in Chinese (中文)."
+    : "\n⚠ LANGUAGE: The card is in English. ALL recommendation text MUST be in English.";
+
   const recentCards = context.existingCards
     .slice(-5)
     .map((c) => `[${c.category}] ${c.content}`)
@@ -200,6 +206,7 @@ function buildRecommendationPrompt(
 
   const parts = [
     `Current card:\nCategory: ${card.category}\nContent: "${card.content}"`,
+    langHint,
     recentCards ? `\nRecent conversation cards:\n${recentCards}` : "",
     topicHint ? `\n${topicHint}` : "",
     memoryHint ? `\nUser memory context:\n${memoryHint}` : "",

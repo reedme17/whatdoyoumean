@@ -1,12 +1,9 @@
 /**
- * BottomBar — session control bar for live sessions.
- * Left: waveform visualization
- * Center: Flag button (⚑)
- * Right: Stop button (■)
+ * BottomBar — editorial session controls.
+ * Waveform left, flag center (red when active), stop right.
  */
 
 import React from "react";
-import { Button } from "./ui/button.js";
 import { Waveform } from "./Waveform.js";
 
 interface Props {
@@ -21,22 +18,29 @@ export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false
     <div
       role="toolbar"
       aria-label="Session controls"
-      className="flex items-center justify-between px-5 py-2.5 border-t border-border bg-background"
+      className="flex items-center justify-between px-8 py-3 border-t border-border bg-background"
     >
-      {/* Left: waveform */}
       <div role="status" aria-live="polite" className="flex items-center gap-2">
         <Waveform analyser={analyser} isCapturing={isCapturing} />
       </div>
 
-      {/* Center: flag */}
-      <Button variant="outline" className="px-4 py-2 text-base" onClick={onFlag} title="Flag this moment (⌘B)" aria-label="Flag this moment">
+      <button
+        className="text-lg hover:text-[var(--color-editorial-red)] transition-colors cursor-pointer bg-transparent border-none"
+        onClick={onFlag}
+        title="Flag this moment (⌘B)"
+        aria-label="Flag this moment"
+      >
         ⚑
-      </Button>
+      </button>
 
-      {/* Right: stop */}
-      <Button className="px-4 py-2 text-sm" onClick={onStop} title="Stop session (⌘⇧S)" aria-label="Stop session">
-        ■ Stop
-      </Button>
+      <button
+        className="text-xs tracking-[0.15em] uppercase text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none font-sans"
+        onClick={onStop}
+        title="Stop session (⌘⇧S)"
+        aria-label="Stop session"
+      >
+        ■ End
+      </button>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 /**
- * TextModeScreen — paste/type text for analysis.
- * Large textarea + Analyze button. After analyze, shows RecapScreen layout.
+ * TextModeScreen — editorial text analysis.
+ * Serif heading, large textarea, analyze button.
  */
 
 import React, { useState } from "react";
@@ -47,19 +47,21 @@ export function TextModeScreen({
 
   return (
     <div className="flex flex-col h-full bg-background" role="main" aria-label="Text analysis mode">
-      {/* Top bar */}
-      <div className="flex items-center justify-between px-5 py-3">
-        <span className="text-base font-semibold">Text Mode</span>
-        <Button variant="ghost" onClick={onClose} aria-label="Close text mode">
+      <div className="flex items-center justify-between px-8 py-5">
+        <h1 className="font-serif text-2xl font-normal">Text Mode</h1>
+        <button
+          className="text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none"
+          onClick={onClose}
+          aria-label="Close text mode"
+        >
           ✕
-        </Button>
+        </button>
       </div>
       <Separator />
 
-      {/* Textarea */}
-      <div className="flex-1 flex flex-col px-5 py-6 gap-4">
+      <div className="flex-1 flex flex-col px-8 py-8 gap-6">
         <Textarea
-          className="flex-1 min-h-[200px] text-[15px] leading-relaxed"
+          className="flex-1 min-h-[200px] text-base leading-relaxed font-serif bg-card"
           placeholder="Paste or type text here..."
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -69,8 +71,8 @@ export function TextModeScreen({
 
         <div className="flex justify-center">
           <Button
-            size="lg"
-            className="px-10"
+            variant="outline"
+            className="px-12 py-3 h-auto text-xs tracking-[0.25em] uppercase font-semibold"
             onClick={() => text.trim() && onAnalyze(text)}
             disabled={!text.trim() || analyzing}
           >
@@ -78,8 +80,8 @@ export function TextModeScreen({
           </Button>
         </div>
 
-        <div className="text-center text-xs text-muted">
-          Supports Chinese, English, and mixed-language text (up to 5000 characters)
+        <div className="text-center text-xs text-muted font-sans">
+          Supports Chinese, English, and mixed-language text
         </div>
       </div>
     </div>

@@ -1,11 +1,10 @@
 /**
- * RecommendationTokens — floating recommendation badges.
- * Tap to copy text to clipboard.
+ * RecommendationTokens — editorial recommendation pills.
+ * Uppercase, letter-spaced, warm gray border.
  */
 
 import React, { useState } from "react";
 import type { Recommendation } from "@wdym/shared";
-import { Badge } from "./ui/badge.js";
 
 interface Props {
   recommendations: Recommendation[];
@@ -30,23 +29,18 @@ export function RecommendationTokens({ recommendations }: Props): React.JSX.Elem
     <div
       role="region"
       aria-label="Recommendations"
-      className="flex flex-wrap gap-2 px-4 py-2 border-t border-border bg-background"
+      className="flex flex-wrap gap-2 px-8 py-3 border-t border-border bg-background"
     >
-      <span className="text-[11px] text-muted self-center">Recommendations</span>
       {recommendations.map((rec) => (
-        <Badge
+        <button
           key={rec.id}
-          className={
-            copiedId === rec.id
-              ? "bg-foreground text-background transition-all duration-150"
-              : "transition-all duration-150"
-          }
+          className="text-[11px] tracking-[0.05em] px-3 py-1 border border-border bg-transparent hover:bg-secondary text-muted hover:text-foreground transition-colors cursor-pointer font-sans"
           onClick={() => handleCopy(rec)}
           title={rec.reasoning}
           aria-label={`Copy recommendation: ${rec.text}`}
         >
-          {copiedId === rec.id ? "Copied!" : rec.text}
-        </Badge>
+          {copiedId === rec.id ? "Copied" : rec.text}
+        </button>
       ))}
     </div>
   );

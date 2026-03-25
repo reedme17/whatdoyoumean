@@ -1,12 +1,11 @@
 /**
- * HomeScreen — idle state.
- * Large START button center, audio source toggle, Text Mode bottom-left, expand (≡) bottom-right.
+ * HomeScreen — editorial idle state.
+ * Large serif title, BEGIN button, audio source toggle.
  */
 
 import React from "react";
 import { Button } from "./ui/button.js";
 import { Toggle } from "./ui/toggle.js";
-import { Badge } from "./ui/badge.js";
 
 interface Props {
   onStart: () => void;
@@ -21,14 +20,16 @@ export function HomeScreen({ onStart, onTextMode, onExpand, audioSource, onToggl
 
   return (
     <div className="flex flex-col w-full h-full bg-background text-foreground" role="main" aria-label="Home">
-      {/* Center: START button + audio source toggle */}
-      <div className="flex flex-col items-center justify-center flex-1 gap-4">
+      <div className="flex flex-col items-center justify-center flex-1 gap-6">
+        <p className="text-xs tracking-[0.2em] uppercase text-muted font-serif">What Do You Mean</p>
+
         <Button
-          className="text-xl font-semibold px-14 py-5 h-auto tracking-widest rounded-lg"
+          variant="outline"
+          className="mt-8 px-12 py-3 h-auto text-xs tracking-[0.25em] uppercase font-semibold"
           onClick={onStart}
           aria-label="Start listening session"
         >
-          START
+          Begin
         </Button>
 
         <Toggle
@@ -36,32 +37,29 @@ export function HomeScreen({ onStart, onTextMode, onExpand, audioSource, onToggl
           size="sm"
           pressed={isSystem}
           onPressedChange={onToggleAudioSource}
+          className="mt-2 text-xs text-muted"
           aria-label={isSystem ? "Switch to microphone only" : "Enable system audio capture"}
         >
-          {isSystem ? "🎤🔊 Mic + System" : "🎤 Mic Only"}
-          {isSystem && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 ml-1">
-              ⚠ experimental
-            </Badge>
-          )}
+          {isSystem ? "🎤🔊 Mic + System" : "🎤 Microphone Only"}
         </Toggle>
       </div>
 
-      {/* Bottom bar: Text Mode left, expand right */}
-      <div className="flex justify-between items-center px-6 py-4">
-        <Button variant="ghost" onClick={onTextMode} aria-label="Switch to text input mode">
+      <div className="flex justify-between items-center px-8 py-5">
+        <button
+          className="text-xs tracking-[0.15em] uppercase text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none font-sans"
+          onClick={onTextMode}
+          aria-label="Switch to text input mode"
+        >
           Text Mode
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="text-xl"
+        </button>
+        <button
+          className="text-lg text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none"
           onClick={onExpand}
           title="Menu (⌘/)"
           aria-label="Open menu"
         >
           ≡
-        </Button>
+        </button>
       </div>
     </div>
   );

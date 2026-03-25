@@ -1,14 +1,12 @@
 /**
- * CoreMeaningCard — displays a single meaning card.
- * Shows category badge, speaker label, content, and optional edit mode.
+ * CoreMeaningCard — editorial pull quote style.
+ * Category as uppercase section label, speaker as italic byline, content in serif.
  */
 
 import React, { useState } from "react";
 import type { CoreMeaningCard as CardType, MeaningCategory } from "@wdym/shared";
-import { Card, CardHeader, CardContent } from "./ui/card.js";
-import { Badge } from "./ui/badge.js";
-import { Button } from "./ui/button.js";
 import { Input } from "./ui/input.js";
+import { Button } from "./ui/button.js";
 import { cn } from "../lib/utils.js";
 
 const categoryLabels: Record<MeaningCategory, string> = {
@@ -43,51 +41,69 @@ export function CoreMeaningCardView({
     setEditing(false);
   };
 
+  const isAccent = card.category === "disagreement" || card.category === "action_item";
+
   return (
-    <Card
-      role="article"
+    <article
       aria-label={`${categoryLabels[card.category]} card: ${card.content.slice(0, 40)}`}
-      className={cn("mb-2 transition-opacity duration-200", isCurrent ? "border-foreground" : "opacity-95")}
+      className="py-5 border-b border-border"
+      style={{ animation: "fadeInUp 0.3s ease-out" }}
     >
-      <CardHeader>
-        {speakerName && <span className="font-semibold">{speakerName}</span>}
-        <Badge role="status" className="text-[10px] px-2 py-0">
+      {/* Category label — uppercase, letter-spaced */}
+      <div className="flex items-center gap-3 mb-1.5">
+        <span
+          className={cn(
+            "text-[10px] tracking-[0.15em] uppercase font-semibold font-sans",
+            isAccent ? "text-[var(--color-editorial-red)]" : "text-muted"
+          )}
+        >
           {categoryLabels[card.category]}
-        </Badge>
-        {card.isHighlighted && <span>★</span>}
-      </CardHeader>
+        </span>
+        {card.isHighlighted && <span className="text-[var(--color-editorial-red)]">★</span>}
+      </div>
 
-      <CardContent>
-        {editing ? (
-          <div className="flex gap-2">
-            <Input
-              className="flex-1"
-              value={editText}
-              onChange={(e) => setEditText(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSave()}
-              autoFocus
-              aria-label="Edit card content"
-            />
-            <Button variant="outline" onClick={handleSave}>Save</Button>
-          </div>
-        ) : (
-          <div
-            className={cn("text-sm leading-relaxed", editable && "cursor-pointer")}
-            onClick={() => editable && setEditing(true)}
-            title={editable ? "Click to edit" : undefined}
-          >
-            {card.content}
-          </div>
-        )}
+      {/* Speaker byline — italic */}
+      {speakerName && (
+        <div className="text-xs italic text-muted mb-2 font-sans">
+          {speakerName}
+        </div>
+      )}
 
-        {card.linkType && (
-          <div className="text-[11px] text-muted mt-1">
-            {card.linkType === "contradicts" && "⟷ Contradicts previous point"}
-            {card.linkType === "modifies" && "↻ Modifies previous point"}
-            {card.linkType === "extends" && "→ Extends previous point"}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      {/* Content — serif pull quote */}
+      {editing ? (
+        <div className="flex gap-2">
+          <Input
+            className="flex-1"
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSave()}
+            autoFocus
+            aria-label="Edit card content"
+          />
+          <Button variant="outline" size="sm" onClick={handleSave}>Save</Button>
+        </div>
+      ) : (
+        <div
+          className={cn(
+            "font-serif text-base leading-relaxed",
+            isCurrent && "text-foreground",
+            editable && "cursor-pointer hover:text-muted transition-colors"
+          )}
+          onClick={() => editable && setEditing(true)}
+          title={editable ? "Click to edit" : undefined}
+        >
+          {card.content}
+        </div>
+      )}
+
+      {/* Link indicator */}
+      {card.linkType && (
+        <div className="text-[11px] text-muted mt-2 font-sans italic">
+          {card.linkType === "contradicts" && "⟷ Contradicts previous point"}
+          {card.linkType === "modifies" && "↻ Modifies previous point"}
+          {card.linkType === "extends" && "→ Extends previous point"}
+        </div>
+      )}
+    </article>
   );
 }

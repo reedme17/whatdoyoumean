@@ -377,6 +377,67 @@ Added three more shadcn/ui components and migrated remaining hand-written UI ele
 
 ---
 
+## Phase 19: Editorial Theme
+
+Applied an editorial/magazine aesthetic to the entire UI.
+
+### Color Palette
+- Warm paper tones: background `#FAF8F5`, foreground `#1A1A1A`, muted `#8C8578`
+- Editorial red accent `#C4553A` — used sparingly for recording indicator, flag, action/disagreement badges
+- Card background `#FFFFFF` for subtle lift against cream background
+- All radii set to 0/2px (no rounded corners — flat editorial look)
+
+### Typography Evolution
+- Started with Playfair Display + Source Sans 3 (editorial direction doc)
+- Switched to Merriweather + Mulish (Journal pairing from fonttrio.xyz)
+- Switched to Plus Jakarta Sans + PT Serif (Curator pairing)
+- Final: **Lora** (heading/cards) + **Nunito Sans** (body/UI) + **Inconsolata** (mono) — Storyteller pairing from fonttrio.xyz
+- Fonts loaded via Google Fonts CDN with CSP allowing `fonts.googleapis.com` and `fonts.gstatic.com`
+
+### Font Loading Issues
+- Local @fontsource approach failed — Tailwind CLI inlined @font-face but woff2 file paths didn't resolve in Electron's file:// protocol
+- Google Fonts CDN approach required CSP update: added `font-src https://fonts.gstatic.com` and `style-src https://fonts.googleapis.com`
+- Tailwind v4 `font-[var(--font-display)]` was parsed as `font-weight` not `font-family` — switched to `font-serif` / `font-sans` Tailwind utilities mapped via `--font-serif` / `--font-sans` theme variables
+
+### Component Styling
+- Cards: no borders, separated by thin rules (`border-b border-border`), content in serif, category as uppercase letter-spaced label
+- Buttons: uppercase, letter-spaced, outline style
+- BottomBar: plain text buttons instead of shadcn Button components
+- ExpandPanel: uppercase letter-spaced menu items, text-only navigation
+- Processing screen: serif italic "Processing..." with expanding line animation
+- Pending preview: serif italic with gentle pulse opacity animation
+
+### Changed Files
+- `globals.css`: Editorial color palette, font variables, animations (fadeInUp, gentlePulse, expandLine)
+- `index.html`: Google Fonts link, updated CSP
+- All component files: Editorial styling with `font-serif` / `font-sans` classes
+- `build-renderer.mjs`: Font file copy step (for local font approach, kept for future use)
+- `Waveform.tsx`: Updated colors to match editorial palette
+
+---
+
+## Phase 20: Language Matching Enhancement
+
+Strengthened language matching for cards and recommendations.
+
+- Added explicit language detection (Chinese character regex) in both `buildAnalysisPrompt` and `buildRecommendationPrompt`
+- User prompt now includes `⚠ LANGUAGE: The card/transcript is in Chinese. ALL text MUST be in Chinese (中文).` when Chinese is detected
+- Previously relied only on system prompt instruction which LLM sometimes ignored
+
+### Changed Files
+- `packages/backend/src/recommendation/engine.ts`: Added `hasChinese` detection + explicit language hint in user prompt
+- `packages/backend/src/semantic/analyzer.ts`: Same language hint added to analysis prompt
+
+---
+
+## Phase 21: Steering & Skills Setup
+
+- Created `.kiro/steering/documentation.md` (auto-included) — rules for updating progress.md and bug reports
+- Created `~/.kiro/skills/frontend-design.md` (global skill) — frontend design quality guidelines
+- Created `docs/design-direction-editorial.md` — editorial design direction reference document
+
+---
+
 ## Architecture Summary
 
 ```

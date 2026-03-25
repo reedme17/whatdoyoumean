@@ -15,6 +15,36 @@ execSync(
 );
 console.log("✅ Tailwind CSS → dist/renderer/styles.css");
 
+// 1b. Copy font files referenced by @fontsource
+import { cpSync, readdirSync } from "node:fs";
+const fontDirs = ["merriweather", "mulish", "source-code-pro"];
+if (!existsSync("dist/renderer/files")) {
+  mkdirSync("dist/renderer/files", { recursive: true });
+}
+for (const font of fontDirs) {
+  const srcDir = `../../node_modules/@fontsource/${font}/files`;
+  try {
+    const files = readdirSync(srcDir);
+    for (const f of files) {
+      cpSync(`${srcDir}/${f}`, `dist/renderer/files/${f}`, { force: true });
+    }
+  } catch {
+    console.warn(`⚠ Font files not found: ${srcDir}`);
+  }
+}
+console.log("✅ Font files copied → dist/renderer/files/");
+
+// 1c. Copy asset files (images)
+import { cpSync as cpSyncFs } from "node:fs";
+const assetsSrc = "src/renderer/assets";
+const assetsDst = "dist/renderer/assets";
+try {
+  cpSyncFs(assetsSrc, assetsDst, { recursive: true, force: true });
+  console.log("✅ Assets copied → dist/renderer/assets/");
+} catch {
+  console.warn("⚠ No assets directory found");
+}
+
 // 2. Bundle React app
 await build({
   entryPoints: ["src/renderer/index.tsx"],

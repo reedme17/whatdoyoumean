@@ -31,7 +31,7 @@ export function Waveform({
         const ctx = canvas.getContext("2d");
         if (ctx) {
           ctx.clearRect(0, 0, width, height);
-          ctx.fillStyle = "#d4d4d8";
+          ctx.fillStyle = "#E8E4DE";
           const barW = width / barCount;
           for (let i = 0; i < barCount; i++) {
             ctx.fillRect(i * barW + 1, height / 2 - 1, barW - 2, 2);
@@ -51,7 +51,7 @@ export function Waveform({
       analyser.getByteFrequencyData(dataArray);
 
       ctx.clearRect(0, 0, width, height);
-      ctx.fillStyle = "#18181b";
+      ctx.fillStyle = "#1A1A1A";
 
       // Sample evenly from frequency data
       const step = Math.floor(dataArray.length / barCount);

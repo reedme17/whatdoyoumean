@@ -1,7 +1,6 @@
 /**
- * LiveSession — full canvas for active listening.
- * Core_Meaning_Cards stack vertically, auto-scroll, recommendation tokens,
- * bottom bar with listening indicator, flag, and stop.
+ * LiveSession — editorial live canvas.
+ * Cards as pull quotes, pending preview in italic, waveform bottom bar.
  */
 
 import React, { useRef, useEffect, useState, useCallback } from "react";
@@ -42,7 +41,7 @@ export function LiveSession({
     if (autoScroll && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [cards, currentCard, autoScroll]);
+  }, [cards, currentCard, autoScroll, pendingPreview]);
 
   const handleScroll = useCallback(() => {
     if (!scrollRef.current) return;
@@ -65,7 +64,7 @@ export function LiveSession({
         role="log"
         aria-live="polite"
         aria-label="Conversation flow"
-        className="flex-1 overflow-y-auto px-5 py-4"
+        className="flex-1 overflow-y-auto px-8 py-6"
       >
         {cards.map((card) => (
           <CoreMeaningCardView key={card.id} card={card} speakerName={getSpeakerName(card)} />
@@ -75,27 +74,31 @@ export function LiveSession({
           <CoreMeaningCardView card={currentCard} speakerName={getSpeakerName(currentCard)} isCurrent />
         )}
 
-        {/* Pending text preview — shows accumulated transcript before card is finalized */}
+        {/* Pending text preview — italic, pulsing opacity */}
         {pendingPreview && (
-          <div className="px-4 py-3 mb-2 rounded-lg border border-dashed border-border text-sm text-muted opacity-70 italic">
+          <div
+            className="py-4 font-serif italic text-muted text-base leading-relaxed"
+            style={{ animation: "gentlePulse 2s ease-in-out infinite" }}
+          >
             {pendingPreview}
           </div>
         )}
 
+        {/* Empty state */}
         {cards.length === 0 && !currentCard && !pendingPreview && (
-          <div className="flex flex-col items-center justify-center h-full text-muted text-sm gap-2">
+          <div className="flex flex-col items-center justify-center h-full gap-3">
             {audioError ? (
               <>
-                <span className="text-destructive">⚠ Mic error: {audioError}</span>
-                <span>Waiting for speech...</span>
+                <span className="text-[var(--color-editorial-red)] text-sm font-sans">⚠ {audioError}</span>
+                <span className="text-xs text-muted font-sans">Waiting for speech...</span>
               </>
             ) : isCapturing ? (
               <>
-                <span className="inline-block w-2.5 h-2.5 rounded-full bg-destructive animate-pulse" />
-                <span>Listening... speak into your microphone</span>
+                <span className="inline-block w-2 h-2 rounded-full bg-[var(--color-editorial-red)] animate-pulse" />
+                <span className="text-xs text-muted tracking-[0.1em] uppercase font-sans">Listening</span>
               </>
             ) : (
-              <span>Waiting for speech...</span>
+              <span className="text-xs text-muted tracking-[0.1em] uppercase font-sans">Waiting for speech</span>
             )}
           </div>
         )}
