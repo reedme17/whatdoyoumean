@@ -5,6 +5,7 @@
  */
 
 import React from "react";
+import { Button } from "./ui/button.js";
 
 interface Props {
   onComplete: () => void;
@@ -34,12 +35,9 @@ export function Onboarding({ onComplete }: Props): React.JSX.Element {
       </p>
 
       {/* Start button — pill shape */}
-      <button
-        className="px-6 py-2 rounded-full bg-secondary text-foreground text-sm font-sans font-bold hover:bg-border transition-colors cursor-pointer"
-        onClick={onComplete}
-      >
+      <Button variant="normal" onClick={onComplete}>
         Start
-      </button>
+      </Button>
     </div>
   );
 }

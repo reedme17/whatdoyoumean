@@ -369,8 +369,9 @@ export function App(): React.JSX.Element {
             resetSession();
             goToScreen("text");
           }}
-          onExpand={() => setPanelOpen(true)}
           audioSource={audioSource}
+          onExpand={() => setPanelOpen(true)}
+          panelOpen={panelOpen}
           onToggleAudioSource={() => setAudioSource((s) => s === "mic" ? "mic+system" : "mic")}
         />
       )}
@@ -436,6 +437,8 @@ export function App(): React.JSX.Element {
         onLogin={handleLogin}
         onLogout={handleLogout}
       />
+
+
     </div>
   );
 }

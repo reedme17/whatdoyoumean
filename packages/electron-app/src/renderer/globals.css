@@ -20,9 +20,9 @@
   --color-card: #FFFFFF;
   --color-card-foreground: #1A1A1A;
   --color-editorial-red: #C4553A;
-  --radius-sm: 0;
-  --radius-md: 0;
-  --radius-lg: 2px;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
 
   /* Typography — Storyteller pairing: Lora (heading) + Nunito Sans (body) + Inconsolata (mono) */
   --font-display: "Lora", "Noto Serif SC", Georgia, serif;

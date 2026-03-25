@@ -6,16 +6,19 @@
 import React from "react";
 import { Button } from "./ui/button.js";
 import { Toggle } from "./ui/toggle.js";
+import { KeyboardIcon } from "./ui/keyboard-icon.js";
+import { Menu } from "lucide-react";
 
 interface Props {
   onStart: () => void;
   onTextMode: () => void;
-  onExpand: () => void;
   audioSource: "mic" | "mic+system";
   onToggleAudioSource: () => void;
+  onExpand: () => void;
+  panelOpen: boolean;
 }
 
-export function HomeScreen({ onStart, onTextMode, onExpand, audioSource, onToggleAudioSource }: Props): React.JSX.Element {
+export function HomeScreen({ onStart, onTextMode, audioSource, onToggleAudioSource, onExpand, panelOpen }: Props): React.JSX.Element {
   const isSystem = audioSource === "mic+system";
 
   return (
@@ -46,20 +49,23 @@ export function HomeScreen({ onStart, onTextMode, onExpand, audioSource, onToggl
 
       <div className="flex justify-between items-center px-8 py-5">
         <button
-          className="text-xs tracking-[0.15em] uppercase text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none font-sans"
+          className="text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none"
           onClick={onTextMode}
           aria-label="Switch to text input mode"
+          title="Text Mode (⌘T)"
         >
-          Text Mode
+          <KeyboardIcon size={20} />
         </button>
-        <button
-          className="text-lg text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none"
-          onClick={onExpand}
-          title="Menu (⌘/)"
-          aria-label="Open menu"
-        >
-          ≡
-        </button>
+        {!panelOpen && (
+          <button
+            className="text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none"
+            onClick={onExpand}
+            title="Menu (⌘/)"
+            aria-label="Open menu"
+          >
+            <Menu size={20} />
+          </button>
+        )}
       </div>
     </div>
   );
