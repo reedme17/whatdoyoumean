@@ -439,11 +439,11 @@ Build a real-time conversation understanding tool as an Electron Mac App + Nativ
 
 > Phase 1 (Tasks 1-26) built the core architecture with stubs. Phase 2 focuses on real-world integration, UX polish, and production readiness.
 
-- [ ] 27. System audio capture (desktopCapturer)
-  - [ ] 27.1 Expose desktopCapturer.getSources() via IPC preload bridge
-  - [ ] 27.2 Capture system audio (meeting/call audio) alongside microphone in useAudioCapture hook
-  - [ ] 27.3 Mix system audio + microphone into a single stream, or send as separate channels for speaker diarization
-  - [ ] 27.4 Handle macOS Screen Recording permission prompt
+- [x] 27. System audio capture (desktopCapturer)
+  - [x] 27.1 Expose desktopCapturer.getSources() via IPC preload bridge
+  - [x] 27.2 Capture system audio (meeting/call audio) alongside microphone in useAudioCapture hook
+  - [x] 27.3 Mix system audio + microphone into a single stream, or send as separate channels for speaker diarization
+  - [x] 27.4 Handle macOS Screen Recording permission prompt
 
 - [ ] 28. LLM prompt optimization
   - [ ] 28.1 Refine semantic analysis prompt for conversation understanding (not generic summarization)

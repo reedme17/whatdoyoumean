@@ -105,7 +105,7 @@ export function App(): React.JSX.Element {
   const { send } = useSocket(handleServerEvent);
 
   // ── Audio capture (renderer-side mic → base64 WAV → backend via WS) ──
-  const { startCapture, stopCapture, isCapturing, error: audioError } = useAudioCapture({ send });
+  const { startCapture, stopCapture, isCapturing, error: audioError } = useAudioCapture({ send, mode: "online" });
 
   // ── Handlers ──
 

@@ -22,6 +22,11 @@ export interface ElectronAPI {
   requestPermissions(): Promise<{ screenRecording: string; microphone: string }>;
   getCaptureState(): Promise<string>;
 
+  /** Get desktop capturer sources for system audio */
+  getDesktopSources(): Promise<Array<{ id: string; name: string }>>;
+  /** Check macOS screen recording permission */
+  getScreenPermission(): Promise<string>;
+
   /** Subscribe to events pushed from the main process */
   onServerEvent(
     callback: (event: { type: string; payload: unknown }) => void
@@ -48,7 +53,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   getCaptureState: () => ipcRenderer.invoke("audio:state"),
 
-  // ── Server → Renderer events ─────────────────────────────────────────────────
+  // ── Desktop Capturer for system audio ──
+  getDesktopSources: () => ipcRenderer.invoke("desktop:getSources"),
+  getScreenPermission: () => ipcRenderer.invoke("desktop:getScreenPermission"),
+
+  // ── Server → Renderer events ──
   onServerEvent: (callback: (event: { type: string; payload: unknown }) => void) => {
     const handler = (_ipcEvent: Electron.IpcRendererEvent, data: { type: string; payload: unknown }) => {
       callback(data);

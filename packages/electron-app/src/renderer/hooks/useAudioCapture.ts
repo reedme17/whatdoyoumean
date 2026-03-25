@@ -16,6 +16,8 @@ const CHUNK_DURATION_SEC = 4;
 interface UseAudioCaptureOptions {
   /** WebSocket send function from useSocket */
   send: (event: { type: string; [key: string]: unknown }) => void;
+  /** Capture mode: "online" captures mic + system audio, "offline" captures mic only */
+  mode?: "online" | "offline";
 }
 
 export interface UseAudioCaptureReturn {
@@ -96,11 +98,12 @@ function downsample(buffer: Float32Array, fromRate: number, toRate: number): Flo
   return result;
 }
 
-export function useAudioCapture({ send }: UseAudioCaptureOptions): UseAudioCaptureReturn {
+export function useAudioCapture({ send, mode = "offline" }: UseAudioCaptureOptions): UseAudioCaptureReturn {
   const [isCapturing, setIsCapturing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const streamRef = useRef<MediaStream | null>(null);
+  const systemStreamRef = useRef<MediaStream | null>(null);
   const contextRef = useRef<AudioContext | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const accumulatorRef = useRef<Float32Array[]>([]);
@@ -157,7 +160,8 @@ export function useAudioCapture({ send }: UseAudioCaptureOptions): UseAudioCaptu
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      // 1. Get microphone stream
+      const micStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           channelCount: 1,
           sampleRate: { ideal: TARGET_SAMPLE_RATE },
@@ -166,14 +170,70 @@ export function useAudioCapture({ send }: UseAudioCaptureOptions): UseAudioCaptu
           echoCancellation: true,
         },
       });
+      streamRef.current = micStream;
 
-      streamRef.current = stream;
+      // 2. Try to get system audio (online mode only)
+      let systemStream: MediaStream | null = null;
+      if (mode === "online" && (window as any).electronAPI?.getDesktopSources) {
+        try {
+          const sources = await (window as any).electronAPI.getDesktopSources();
+          // Pick the first screen source (usually "Entire Screen")
+          const screenSource = sources.find((s: { name: string }) =>
+            s.name.includes("Entire Screen") || s.name.includes("Screen")
+          ) ?? sources[0];
 
-      const audioContext = new AudioContext({ sampleRate: undefined }); // use device native rate
+          if (screenSource) {
+            systemStream = await navigator.mediaDevices.getUserMedia({
+              audio: {
+                mandatory: {
+                  chromeMediaSource: "desktop",
+                  chromeMediaSourceId: screenSource.id,
+                },
+              } as any,
+              video: {
+                mandatory: {
+                  chromeMediaSource: "desktop",
+                  chromeMediaSourceId: screenSource.id,
+                  maxWidth: 1,
+                  maxHeight: 1,
+                  maxFrameRate: 1,
+                },
+              } as any,
+            });
+            // Stop the video track — we only need audio
+            systemStream.getVideoTracks().forEach((t) => t.stop());
+            systemStreamRef.current = systemStream;
+            console.log("[AudioCapture] System audio captured via desktopCapturer");
+          }
+        } catch (sysErr) {
+          console.warn("[AudioCapture] System audio capture failed (may need Screen Recording permission):", sysErr);
+          // Continue with mic only
+        }
+      }
+
+      // 3. Set up AudioContext and mix streams
+      const audioContext = new AudioContext({ sampleRate: undefined });
       contextRef.current = audioContext;
 
-      const source = audioContext.createMediaStreamSource(stream);
-      // ScriptProcessorNode with 4096 buffer, mono input, mono output
+      const micSource = audioContext.createMediaStreamSource(micStream);
+
+      // If we have system audio, mix it with mic
+      let mixedSource: AudioNode;
+      if (systemStream && systemStream.getAudioTracks().length > 0) {
+        const sysSource = audioContext.createMediaStreamSource(systemStream);
+        const merger = audioContext.createChannelMerger(2);
+        micSource.connect(merger, 0, 0);
+        sysSource.connect(merger, 0, 1);
+        // Convert stereo merger output to mono
+        const monoMixer = audioContext.createGain();
+        merger.connect(monoMixer);
+        mixedSource = monoMixer;
+        console.log("[AudioCapture] Mixing mic + system audio");
+      } else {
+        mixedSource = micSource;
+        console.log("[AudioCapture] Mic only (no system audio)");
+      }
+
       const processor = audioContext.createScriptProcessor(4096, 1, 1);
       processorRef.current = processor;
 
@@ -196,7 +256,7 @@ export function useAudioCapture({ send }: UseAudioCaptureOptions): UseAudioCaptu
         }
       };
 
-      source.connect(processor);
+      mixedSource.connect(processor);
       processor.connect(audioContext.destination);
 
       capturingRef.current = true;
@@ -228,6 +288,9 @@ export function useAudioCapture({ send }: UseAudioCaptureOptions): UseAudioCaptu
 
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
+
+    systemStreamRef.current?.getTracks().forEach((t) => t.stop());
+    systemStreamRef.current = null;
 
     setIsCapturing(false);
     setError(null);

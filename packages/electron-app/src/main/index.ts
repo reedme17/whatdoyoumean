@@ -6,7 +6,7 @@
  * - Targets macOS 13 (Ventura) and later
  */
 
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain, desktopCapturer, systemPreferences } from "electron";
 import * as path from "node:path";
 import { StubAudioCaptureEngine } from "./audio-capture-stub.js";
 
@@ -82,6 +82,24 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle("audio:state", async () => {
     return audioCaptureEngine.state;
+  });
+
+  // ── Desktop Capturer for system audio ──
+  ipcMain.handle("desktop:getSources", async () => {
+    const sources = await desktopCapturer.getSources({
+      types: ["screen", "window"],
+      fetchWindowIcons: false,
+    });
+    return sources.map((s) => ({ id: s.id, name: s.name }));
+  });
+
+  ipcMain.handle("desktop:getScreenPermission", async () => {
+    // Check if screen recording permission is granted (macOS)
+    if (process.platform === "darwin") {
+      const status = systemPreferences.getMediaAccessStatus("screen");
+      return status; // "granted" | "denied" | "not-determined" | "restricted"
+    }
+    return "granted";
   });
 }
 
