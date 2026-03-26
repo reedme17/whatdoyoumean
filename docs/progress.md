@@ -620,3 +620,28 @@ Added GSAP-powered animations for the BottomBar pending text expand/collapse.
 - `packages/electron-app/src/renderer/components/LiveSession.tsx` (full-width waveform)
 - `packages/electron-app/src/renderer/components/PulseLine.tsx` (kept but unused)
 - `packages/electron-app/src/renderer/components/WaveEdge.tsx` (kept but unused)
+
+---
+
+## Phase 26: UI Polish — Icon Alignment, Animations, Scroll Clipping
+
+### ExpandPanel X Icon Alignment
+- X close button in drawer panel now positioned at exactly the same screen coordinates as the menu icon on HomeScreen
+- Changed padding from `px-8 py-5` (32px/20px) to `px-[19px] py-[19px]` to match HomeScreen's `p-[9px]` outer + `p-[10px]` inner = 19px from window edge
+
+### BottomBar Pending Height Animation (GSAP)
+- Added ResizeObserver on pending text block to animate height changes when text grows (more lines added mid-display)
+- Uses GSAP `expo.out` ease, 0.4s duration for smooth height transitions
+- Added `tweening` guard flag to prevent ResizeObserver/GSAP feedback loop (observer detects GSAP height change → triggers new animation → infinite shaking)
+
+### End Button Hover Timing
+- Square icon hover scale transition changed to 400ms ease-out (was default 150ms CSS transition)
+
+### LiveSession Scroll Clipping
+- Added `overflow-hidden` to LiveSession outer container
+- Prevents user from scrolling past the BottomBar's 100px negative margin sink area below the window edge
+
+### Changed Files
+- `packages/electron-app/src/renderer/components/ExpandPanel.tsx` (X icon padding alignment)
+- `packages/electron-app/src/renderer/components/BottomBar.tsx` (ResizeObserver height animation, tweening guard, End hover 400ms)
+- `packages/electron-app/src/renderer/components/LiveSession.tsx` (overflow-hidden)
