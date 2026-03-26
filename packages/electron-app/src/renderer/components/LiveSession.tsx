@@ -50,7 +50,7 @@ export function LiveSession({
   }, []);
 
   return (
-    <div className="flex flex-col h-full bg-background" role="main" aria-label="Live session">
+    <div className="flex flex-col h-full bg-background overflow-hidden" role="main" aria-label="Live session">
       {/* Card area */}
       <div
         ref={scrollRef}
