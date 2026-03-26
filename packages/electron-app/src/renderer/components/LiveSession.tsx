@@ -78,24 +78,8 @@ export function LiveSession({
           )}
         </div>
 
-        {/* Empty state */}
-        {cards.length === 0 && !pendingPreview && (
-          <div className="flex flex-col items-center justify-center flex-1 gap-3">
-            {audioError ? (
-              <>
-                <span className="text-[var(--color-editorial-red)] text-sm font-sans">⚠ {audioError}</span>
-                <span className="text-xs text-muted font-sans">Waiting for speech...</span>
-              </>
-            ) : isCapturing ? (
-              <>
-                <span className="inline-block w-2 h-2 rounded-full bg-[var(--color-editorial-red)] animate-pulse" />
-                <span className="text-xs text-muted tracking-[0.1em] uppercase font-sans">Listening</span>
-              </>
-            ) : (
-              <span className="text-xs text-muted tracking-[0.1em] uppercase font-sans">Waiting for speech</span>
-            )}
-          </div>
-        )}
+        {/* Empty state — just blank space, bottom bar has Listening indicator */}
+        {cards.length === 0 && !pendingPreview && null}
       </div>
 
       <RecommendationTokens recommendations={recommendations} />

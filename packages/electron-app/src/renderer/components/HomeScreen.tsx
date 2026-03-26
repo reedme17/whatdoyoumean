@@ -22,9 +22,12 @@ interface Props {
 export function HomeScreen({ onStart, onTextMode, onExpand, panelOpen }: Props): React.JSX.Element {
   const [transitioning, setTransitioning] = useState(false);
   const [morphStyle, setMorphStyle] = useState<React.CSSProperties | null>(null);
+  const [placeholderSize, setPlaceholderSize] = useState<{ w: number; h: number } | null>(null);
   const controls = useAnimation();
   const textControls = useAnimation();
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const kbRef = useRef<HTMLButtonElement>(null);
+  const [kbFixedStyle, setKbFixedStyle] = useState<React.CSSProperties | null>(null);
 
   const handleStart = useCallback(async () => {
     if (transitioning) return;
@@ -34,6 +37,16 @@ export function HomeScreen({ onStart, onTextMode, onExpand, panelOpen }: Props):
     if (!button) { onStart(); return; }
 
     const rect = button.getBoundingClientRect();
+
+    // Save button size for placeholder before going fixed
+    setPlaceholderSize({ w: rect.width, h: rect.height });
+
+    // Fix keyboard icon in place too
+    const kb = kbRef.current;
+    if (kb) {
+      const kbRect = kb.getBoundingClientRect();
+      setKbFixedStyle({ position: "fixed", top: kbRect.top, left: kbRect.left, zIndex: 9998 });
+    }
 
     // Switch button to fixed position at its current screen location
     setMorphStyle({
@@ -89,7 +102,8 @@ export function HomeScreen({ onStart, onTextMode, onExpand, panelOpen }: Props):
           Ready to interpret for you.
         </motion.p>
         <div className="flex items-center justify-center gap-[12px]">
-          <motion.button
+          <div style={placeholderSize ? { width: placeholderSize.w, height: placeholderSize.h } : undefined}>
+            <motion.button
             ref={buttonRef}
             animate={controls}
             whileTap={transitioning ? undefined : { scale: 0.96 }}
@@ -100,12 +114,15 @@ export function HomeScreen({ onStart, onTextMode, onExpand, panelOpen }: Props):
           >
             <motion.span animate={textControls} className="whitespace-nowrap">Start listening</motion.span>
           </motion.button>
+          </div>
           <motion.button
+            ref={kbRef}
             className="text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0 shrink-0"
             onClick={onTextMode}
             aria-label="Switch to text input mode"
             title="Text Mode (⌘T)"
             animate={textControls}
+            style={kbFixedStyle ?? undefined}
           >
             <KeyboardIcon size={20} />
           </motion.button>
@@ -114,16 +131,15 @@ export function HomeScreen({ onStart, onTextMode, onExpand, panelOpen }: Props):
 
       {/* Bottom — menu icon */}
       <motion.div className="flex flex-col items-end p-[10px] w-full shrink-0" animate={textControls}>
-        {!panelOpen && (
-          <button
-            className="text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0"
-            onClick={onExpand}
-            title="Menu (⌘/)"
-            aria-label="Open menu"
-          >
-            <Menu size={20} />
-          </button>
-        )}
+        <button
+          className="text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0"
+          onClick={onExpand}
+          title="Menu (⌘/)"
+          aria-label="Open menu"
+          style={{ visibility: panelOpen ? "hidden" : "visible" }}
+        >
+          <Menu size={20} />
+        </button>
       </motion.div>
     </div>
   );
