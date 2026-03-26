@@ -8,6 +8,7 @@ import type { CoreMeaningCard, Recommendation } from "@wdym/shared";
 import { CoreMeaningCardView } from "./CoreMeaningCard.js";
 import { RecommendationTokens } from "./RecommendationTokens.js";
 import { BottomBar } from "./BottomBar.js";
+import { Waveform } from "./Waveform.js";
 
 interface Props {
   cards: CoreMeaningCard[];
@@ -98,6 +99,11 @@ export function LiveSession({
       </div>
 
       <RecommendationTokens recommendations={recommendations} />
+
+      {/* Full-width waveform above bottom bar */}
+      <div className="w-full px-[20px] shrink-0">
+        <Waveform analyser={analyser} isCapturing={isCapturing} width={600} height={60} barCount={40} color="#F0EDE8" idleColor="#E8E4DE" mode="wave" />
+      </div>
 
       <BottomBar
         onFlag={onFlag}

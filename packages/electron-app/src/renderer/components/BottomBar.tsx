@@ -3,11 +3,27 @@
  * GSAP per-character blur + fade. Pending block always in DOM (no mount/unmount flash).
  */
 
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import gsap from "gsap";
 import { MapPinPlusIcon } from "./ui/map-pin-plus-icon.js";
-import { Waveform } from "./Waveform.js";
 import { Square } from "lucide-react";
+
+// Sequence: 0→1→2→3→pause(3s)→2→1→0→pause(3s), 0.5s per step
+const DOT_SEQUENCE = [0, 1, 2, 3, 3, 3, 3, 3, 3, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0];
+
+function ListeningDots(): React.JSX.Element {
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setIdx((i) => (i + 1) % DOT_SEQUENCE.length), 500);
+    return () => clearInterval(id);
+  }, []);
+  const dots = ".".repeat(DOT_SEQUENCE[idx]);
+  return (
+    <span className="font-sans font-medium text-sm text-[#93918E] whitespace-nowrap" style={{ minWidth: 80 }}>
+      Listening{dots}
+    </span>
+  );
+}
 
 interface Props {
   onFlag: () => void;
@@ -44,11 +60,11 @@ export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false
       gsap.set(block, { height: 0, opacity: 0 });
       gsap.set(outer, { gap: 0 });
 
-      gsap.to(block, { height: h, opacity: 1, duration: 0.35, ease: "power2.out", onComplete: () => {
+      gsap.to(block, { height: h, opacity: 1, duration: 0.8, ease: "expo.out", onComplete: () => {
         gsap.set(block, { height: "auto" });
         animatingRef.current = false;
       }});
-      gsap.to(outer, { gap: 20, duration: 0.35, ease: "power2.out" });
+      gsap.to(outer, { gap: 20, duration: 0.8, ease: "expo.out" });
     }
 
     // Text disappeared — shrink with char blur
@@ -71,13 +87,13 @@ export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false
       });
 
       if (speaker) {
-        tl.to(speaker, { opacity: 0, filter: "blur(8px)", duration: 0.25, ease: "power2.in" }, 0);
+        tl.to(speaker, { opacity: 0, filter: "blur(8px)", duration: 0.8, ease: "power2.in" }, 0);
       }
       if (charSpans && charSpans.length > 0) {
-        tl.to(charSpans, { opacity: 0, filter: "blur(6px)", duration: 0.3, ease: "power2.in", stagger: 0.015 }, 0);
+        tl.to(charSpans, { opacity: 0, filter: "blur(6px)", duration: 0.8, ease: "power2.in", stagger: 0.015 }, 0);
       }
-      tl.to(block, { height: 0, overflow: "hidden", duration: 0.4, ease: "power2.out" }, 0.1);
-      tl.to(outer, { gap: 0, duration: 0.4, ease: "power2.out" }, 0.1);
+      tl.to(block, { height: 0, overflow: "hidden", duration: 0.8, ease: "expo.out" }, 0.1);
+      tl.to(outer, { gap: 0, duration: 0.8, ease: "expo.out" }, 0.1);
     }
   }, [pendingPreview]);
 
@@ -89,7 +105,7 @@ export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false
       ref={outerRef}
       role="toolbar"
       aria-label="Session controls"
-      className="flex flex-col items-start px-[19px] py-[14px] bg-[#F0EDE8] w-full -mb-[100px]"
+      className="flex flex-col items-start px-[19px] py-[14px] bg-[#F0EDE8] w-full -mb-[100px] relative overflow-visible"
       style={{ borderRadius: "16px 16px 10px 10px", paddingBottom: 114, gap: 0 }}
     >
       {/* Pending block — always in DOM, hidden when empty */}
@@ -123,10 +139,7 @@ export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false
       {/* Controls row */}
       <div className="flex items-center justify-between w-full">
         <div className="flex-1 min-w-0 flex items-center gap-2">
-          <span className="font-sans font-medium text-sm text-[#93918E] whitespace-nowrap">
-            Listening...
-          </span>
-          <Waveform analyser={analyser} isCapturing={isCapturing} width={60} height={16} />
+          <ListeningDots />
         </div>
 
         <button
@@ -140,12 +153,12 @@ export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false
 
         <div className="flex-1 min-w-0 flex items-center justify-end gap-[6px]">
           <button
-            className="flex items-center gap-[6px] text-sm font-sans font-medium text-[#93918E] hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0"
+            className="flex items-center gap-[6px] text-sm font-sans font-medium text-[#93918E] hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0 group"
             onClick={onStop}
             title="Stop session (⌘⇧S)"
             aria-label="Stop session"
           >
-            <Square size={10} fill="currentColor" strokeWidth={0} />
+            <Square size={10} fill="currentColor" strokeWidth={0} className="transition-transform group-hover:scale-[1.2]" />
             End
           </button>
         </div>

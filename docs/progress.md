@@ -591,3 +591,32 @@ Added GSAP-powered animations for the BottomBar pending text expand/collapse.
 - `packages/electron-app/src/renderer/components/BottomBar.tsx`
 - `packages/electron-app/src/renderer/components/LiveSession.tsx`
 - `package.json` (gsap dependency)
+
+---
+
+## Phase 25: LiveSession Polish — Waveform, Animations, Micro-interactions
+
+### Full-Width Waveform Above BottomBar
+- Added wave mode to Waveform component: smooth organic bezier curves from time-domain audio data
+- Only upper half (baseline at bottom, curves upward), filled with BottomBar color `#F0EDE8`
+- EMA temporal smoothing (alpha=0.06) for slow, gentle movement
+- Center 50% window with cosine fade at edges — no hard cutoff
+- Replaces previous bar-style waveform and abandoned SVG wave edge / PulseLine approaches
+
+### BottomBar Animation Tuning
+- Bubble expand/collapse: GSAP `expo.out` ease, 0.8s duration
+- Exit: per-character blur + fade with stagger, simultaneous height + gap collapse
+
+### Listening Dots Animation
+- "Listening" text with animated dots: 0→1→2→3 dots (0.5s each), pause 3s, then 3→2→1→0, pause 3s, loop
+- Replaces static "Listening..." text
+
+### End Button Hover
+- Square icon scales up 20% on hover (`group-hover:scale-[1.2]` with transition)
+
+### Changed Files
+- `packages/electron-app/src/renderer/components/Waveform.tsx` (wave mode, color/idle props, bottom-aligned bars)
+- `packages/electron-app/src/renderer/components/BottomBar.tsx` (ListeningDots, expo.out timing, Square hover)
+- `packages/electron-app/src/renderer/components/LiveSession.tsx` (full-width waveform)
+- `packages/electron-app/src/renderer/components/PulseLine.tsx` (kept but unused)
+- `packages/electron-app/src/renderer/components/WaveEdge.tsx` (kept but unused)
