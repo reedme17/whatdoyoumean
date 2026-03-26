@@ -52,12 +52,14 @@ export function HomeScreen({ onStart, onTextMode, onExpand, panelOpen }: Props):
     // Small delay to let fixed positioning apply
     await new Promise((r) => setTimeout(r, 20));
 
-    // Animate to bottom bar position (bottom of window, full width, 48px tall)
+    // Animate to bottom bar position (bottom of window, full width)
+    // BottomBar is 148px tall with -mb-[100px], so top edge is at innerHeight - 48
+    // but the element itself extends 100px below. Match that exactly.
     await controls.start({
       top: window.innerHeight - 48,
       left: 0,
       width: window.innerWidth,
-      height: 48,
+      height: 148,
       borderRadius: "16px 16px 10px 10px",
       transition: {
         type: "tween",

@@ -20,7 +20,7 @@ export function BottomBar({ onFlag, onStop }: Props): React.JSX.Element {
     <motion.div
       role="toolbar"
       aria-label="Session controls"
-      className="flex items-center justify-between h-[48px] px-[19px] py-[14px] bg-[#F0EDE8] w-full"
+      className="flex items-start justify-between h-[148px] px-[19px] pt-[14px] bg-[#F0EDE8] w-full -mb-[100px]"
       style={{ borderRadius: "16px 16px 10px 10px" }}
     >
       {/* Left — Listening status */}
