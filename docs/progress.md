@@ -551,3 +551,43 @@ Redesigned HomeScreen from Figma and implemented button-to-bottom-bar morph anim
 - `packages/electron-app/src/renderer/components/ExpandPanel.tsx`
 - `packages/electron-app/src/main/index.ts`
 - `packages/backend/src/ws/handler.ts`
+
+---
+
+## Phase 24: GSAP Bubble Animations
+
+Added GSAP-powered animations for the BottomBar pending text expand/collapse.
+
+### GSAP Integration
+- Installed `gsap` package (from public npm registry — CodeArtifact doesn't have it)
+- Used GSAP Timeline for precise multi-property animation sequencing
+
+### BottomBar Pending Text Animations
+
+**Enter animation** (pending text appears):
+- Block height: 0 → auto (350ms, power2.out)
+- Block opacity: 0 → 1 (simultaneous)
+- Outer gap: 0 → 20px (simultaneous)
+
+**Exit animation** (card finalized, pending text disappears):
+- Per-character blur(6px) + fade with stagger (300ms, 15ms stagger, power2.in)
+- Speaker name blur(8px) + fade (250ms)
+- Block height → 0 (400ms, power2.out, starts 100ms after text blur)
+- Outer gap → 0 (simultaneous with height)
+
+### Key Architecture Decision: Always-in-DOM Pending Block
+- Pending block is always rendered in DOM (not conditionally mounted/unmounted)
+- Hidden state: `height: 0, overflow: hidden, visibility: hidden`
+- This prevents the flash/flicker that occurred when React removed DOM nodes after GSAP exit animations
+- GSAP controls visibility via inline styles, React never adds/removes the element
+
+### Flying Bubble Attempt (Abandoned)
+- Tried implementing a "bubble split" animation where pending text flies from BottomBar to card area
+- Approaches tried: motion `layoutId`, manual GSAP with fixed positioning, absolute positioning
+- All had issues with position calculation or visibility
+- Simplified to: bubble shrinks back + card appears in history simultaneously
+
+### Changed Files
+- `packages/electron-app/src/renderer/components/BottomBar.tsx`
+- `packages/electron-app/src/renderer/components/LiveSession.tsx`
+- `package.json` (gsap dependency)
