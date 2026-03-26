@@ -103,14 +103,21 @@ export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false
   useEffect(() => {
     const block = pendingBlockRef.current;
     if (!block) return;
+    let tweening = false;
     const ro = new ResizeObserver(() => {
-      if (animatingRef.current) return;
+      if (animatingRef.current || tweening) return;
       const h = block.offsetHeight;
       const prev = lastHeightRef.current;
       if (prev > 0 && h !== prev && block.style.visibility !== "hidden") {
-        gsap.fromTo(block, { height: prev }, { height: h, duration: 0.4, ease: "expo.out", onComplete: () => gsap.set(block, { height: "auto" }) });
+        tweening = true;
+        gsap.fromTo(block, { height: prev }, { height: h, duration: 0.4, ease: "expo.out", onComplete: () => {
+          gsap.set(block, { height: "auto" });
+          lastHeightRef.current = block.offsetHeight;
+          tweening = false;
+        }});
+      } else {
+        lastHeightRef.current = h;
       }
-      lastHeightRef.current = h;
     });
     ro.observe(block);
     return () => ro.disconnect();
@@ -177,7 +184,7 @@ export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false
             title="Stop session (⌘⇧S)"
             aria-label="Stop session"
           >
-            <Square size={10} fill="currentColor" strokeWidth={0} className="group-hover:scale-[1.2]" style={{ transition: "transform 225ms ease-out" }} />
+            <Square size={10} fill="currentColor" strokeWidth={0} className="group-hover:scale-[1.2]" style={{ transition: "transform 400ms ease-out" }} />
             End
           </button>
         </div>
