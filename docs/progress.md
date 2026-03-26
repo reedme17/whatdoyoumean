@@ -499,3 +499,55 @@ Added user-configurable language preference for Whisper STT to improve transcrip
 - `packages/electron-app/src/renderer/components/ExpandPanel.tsx`
 - `packages/electron-app/src/renderer/components/HomeScreen.tsx`
 - `packages/backend/src/ws/handler.ts`
+
+---
+
+## Phase 23: HomeScreen Redesign + Button Morph Animation
+
+Redesigned HomeScreen from Figma and implemented button-to-bottom-bar morph animation.
+
+### HomeScreen Redesign (from Figma)
+- Three-section vertical layout: titlebar spacer / content / menu area
+- Tagline: "Ready to interpret for you." — Lora 20px, color `#60594D`
+- "Start listening" pill button — Nunito Sans Bold 14px, bg `#F0EDE8`, text `#5B5449`, border-radius 18px
+- Keyboard icon (text mode) next to button, gap 12px
+- Menu icon bottom-right, padding 10px inside container + 9px outer
+- Layout matches Figma Auto Layout: `justify-between p-[9px]`, content group `gap-[20px] items-center`
+
+### Button Morph Animation
+- Click "Start listening" → button morphs into BottomBar before screen transition
+- Uses `position: fixed` + `getBoundingClientRect()` for pixel-perfect animation
+- Animates: width (pill → full), height (36 → 148), position (center → bottom), borderRadius (18 → 16/16/10/10)
+- Text fades out during morph, BottomBar content fades in after
+- Easing: `cubic-bezier(.7, .01, .23, 1.13)` — slow start, fast middle, slight overshoot
+- Duration: 700ms
+- `layoutId` approach abandoned — doesn't work across screen mount/unmount (causes border-radius drop to 0 and position teleporting)
+
+### BottomBar Redesign (from Figma)
+- Height 148px with `-mb-[100px]` (100px extends below window for sink effect)
+- Content in top 48px: "Listening..." + waveform | MapPinPlus flag icon | Square + "End"
+- Colors: bg `#F0EDE8`, text `#93918E`, border-radius `16px 16px 10px 10px`
+- MapPinPlusIcon: hand-written SVG + motion animation (plus sign pulses on hover)
+- Square icon from lucide-react (10px, filled) for End button
+- Waveform (60×16) added next to "Listening..." text
+
+### Global Button Updates
+- Normal variant: border-radius 18px, text color `#5B5449`
+- All buttons: `motion.button` with `whileTap: { scale: 0.96 }` pressed state
+- Press-then-act: onClick fires only after scale-back animation completes (150ms)
+- `whitespace-nowrap` on button text to prevent wrapping during scale animation
+
+### Other Changes
+- Window default size: 640×480
+- STT language selection: zh+en (default), en, zh, auto — in Settings panel
+- HomeScreen tagline: "Ready to interpret for you."
+
+### Changed Files
+- `packages/electron-app/src/renderer/components/HomeScreen.tsx`
+- `packages/electron-app/src/renderer/components/BottomBar.tsx`
+- `packages/electron-app/src/renderer/components/ui/button.tsx`
+- `packages/electron-app/src/renderer/components/ui/map-pin-plus-icon.tsx` (new)
+- `packages/electron-app/src/renderer/App.tsx`
+- `packages/electron-app/src/renderer/components/ExpandPanel.tsx`
+- `packages/electron-app/src/main/index.ts`
+- `packages/backend/src/ws/handler.ts`

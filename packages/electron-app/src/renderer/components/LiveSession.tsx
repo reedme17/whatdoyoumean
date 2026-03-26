@@ -1,6 +1,7 @@
 /**
- * LiveSession — editorial live canvas.
- * Cards as pull quotes, pending preview in italic, waveform bottom bar.
+ * LiveSession — listening screen.
+ * Cards grouped by speaker, pending text in bottom bar, controls at bottom.
+ * Matches Figma: cards px-20, speaker blocks with gap-8 card lines.
  */
 
 import React, { useRef, useEffect, useState, useCallback } from "react";
@@ -24,9 +25,7 @@ interface Props {
 
 export function LiveSession({
   cards,
-  currentCard,
   recommendations,
-  speakers,
   isCapturing = false,
   audioError = null,
   analyser = null,
@@ -41,52 +40,49 @@ export function LiveSession({
     if (autoScroll && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [cards, currentCard, autoScroll, pendingPreview]);
+  }, [cards, autoScroll, pendingPreview]);
 
   const handleScroll = useCallback(() => {
     if (!scrollRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
-    const atBottom = scrollHeight - scrollTop - clientHeight < 40;
-    setAutoScroll(atBottom);
+    setAutoScroll(scrollHeight - scrollTop - clientHeight < 40);
   }, []);
-
-  const getSpeakerName = (card: CoreMeaningCard) => {
-    const segId = card.sourceSegmentIds[0];
-    return speakers.get(segId ?? "") ?? "Speaker";
-  };
 
   return (
     <div className="flex flex-col h-full bg-background" role="main" aria-label="Live session">
-      {/* Canvas area */}
+      {/* Card area — scrollable, content pushed to bottom */}
       <div
         ref={scrollRef}
         onScroll={handleScroll}
         role="log"
         aria-live="polite"
         aria-label="Conversation flow"
-        className="flex-1 overflow-y-auto px-8 py-6"
+        className="flex-1 flex flex-col justify-end overflow-y-auto px-[20px]"
       >
-        {cards.map((card) => (
-          <CoreMeaningCardView key={card.id} card={card} speakerName={getSpeakerName(card)} />
-        ))}
-
-        {currentCard && (
-          <CoreMeaningCardView card={currentCard} speakerName={getSpeakerName(currentCard)} isCurrent />
-        )}
-
-        {/* Pending text preview — italic, pulsing opacity */}
-        {pendingPreview && (
-          <div
-            className="py-4 font-serif italic text-muted text-base leading-relaxed"
-            style={{ animation: "gentlePulse 2s ease-in-out infinite" }}
-          >
-            {pendingPreview}
-          </div>
-        )}
+        <div className="flex flex-col gap-[10px]">
+          {/* Speaker 1 card block */}
+          {cards.length > 0 && (
+            <div className="flex flex-col gap-[10px] px-[20px] py-[12px]">
+              {/* Speaker header */}
+              <div className="flex items-baseline gap-[10px]">
+                <span className="font-sans font-semibold text-sm text-[#60594D]">Speaker 1</span>
+              </div>
+              {/* Cards with dividers */}
+              <div className="flex flex-col gap-[8px]">
+                {cards.map((card, i) => (
+                  <React.Fragment key={card.id}>
+                    {i > 0 && <div className="w-full h-px bg-border" />}
+                    <CoreMeaningCardView card={card} />
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Empty state */}
-        {cards.length === 0 && !currentCard && !pendingPreview && (
-          <div className="flex flex-col items-center justify-center h-full gap-3">
+        {cards.length === 0 && !pendingPreview && (
+          <div className="flex flex-col items-center justify-center flex-1 gap-3">
             {audioError ? (
               <>
                 <span className="text-[var(--color-editorial-red)] text-sm font-sans">⚠ {audioError}</span>
@@ -105,7 +101,15 @@ export function LiveSession({
       </div>
 
       <RecommendationTokens recommendations={recommendations} />
-      <BottomBar onFlag={onFlag} onStop={onStop} analyser={analyser} isCapturing={isCapturing} />
+
+      {/* Bottom bar with pending text */}
+      <BottomBar
+        onFlag={onFlag}
+        onStop={onStop}
+        analyser={analyser}
+        isCapturing={isCapturing}
+        pendingPreview={pendingPreview}
+      />
     </div>
   );
 }

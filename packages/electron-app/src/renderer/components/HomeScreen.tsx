@@ -98,7 +98,7 @@ export function HomeScreen({ onStart, onTextMode, onExpand, panelOpen }: Props):
             onClick={handleStart}
             aria-label="Start listening session"
           >
-            <motion.span animate={textControls}>Start listening</motion.span>
+            <motion.span animate={textControls} className="whitespace-nowrap">Start listening</motion.span>
           </motion.button>
           <motion.button
             className="text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0 shrink-0"

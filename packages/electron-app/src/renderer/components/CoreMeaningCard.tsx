@@ -1,13 +1,12 @@
 /**
- * CoreMeaningCard — editorial pull quote style.
- * Category as uppercase section label, speaker as italic byline, content in serif.
+ * CoreMeaningCard — inline category + content style.
+ * Category italic 11px, content medium 14px, baseline aligned.
  */
 
 import React, { useState } from "react";
 import type { CoreMeaningCard as CardType, MeaningCategory } from "@wdym/shared";
 import { Input } from "./ui/input.js";
 import { Button } from "./ui/button.js";
-import { cn } from "../lib/utils.js";
 
 const categoryLabels: Record<MeaningCategory, string> = {
   factual_statement: "Fact",
@@ -28,9 +27,7 @@ interface Props {
 
 export function CoreMeaningCardView({
   card,
-  speakerName,
   editable = false,
-  isCurrent = false,
   onEdit,
 }: Props): React.JSX.Element {
   const [editing, setEditing] = useState(false);
@@ -41,39 +38,21 @@ export function CoreMeaningCardView({
     setEditing(false);
   };
 
-  const isAccent = card.category === "disagreement" || card.category === "action_item";
-
   return (
-    <article
-      aria-label={`${categoryLabels[card.category]} card: ${card.content.slice(0, 40)}`}
-      className="py-5 border-b border-border"
+    <div
+      className="flex gap-[8px] items-baseline text-[#60594D]"
       style={{ animation: "fadeInUp 0.3s ease-out" }}
     >
-      {/* Category label — uppercase, letter-spaced */}
-      <div className="flex items-center gap-3 mb-1.5">
-        <span
-          className={cn(
-            "text-[10px] tracking-[0.15em] uppercase font-semibold font-sans",
-            isAccent ? "text-[var(--color-editorial-red)]" : "text-muted"
-          )}
-        >
-          {categoryLabels[card.category]}
-        </span>
-        {card.isHighlighted && <span className="text-[var(--color-editorial-red)]">★</span>}
-      </div>
+      {/* Category — italic 11px */}
+      <span className="font-sans italic text-[11px] whitespace-nowrap shrink-0">
+        {categoryLabels[card.category]}
+      </span>
 
-      {/* Speaker byline — italic */}
-      {speakerName && (
-        <div className="text-xs italic text-muted mb-2 font-sans">
-          {speakerName}
-        </div>
-      )}
-
-      {/* Content — serif pull quote */}
+      {/* Content — medium 14px */}
       {editing ? (
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-1">
           <Input
-            className="flex-1"
+            className="flex-1 text-sm"
             value={editText}
             onChange={(e) => setEditText(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSave()}
@@ -83,27 +62,14 @@ export function CoreMeaningCardView({
           <Button variant="outline" size="sm" onClick={handleSave}>Save</Button>
         </div>
       ) : (
-        <div
-          className={cn(
-            "font-serif text-base leading-relaxed",
-            isCurrent && "text-foreground",
-            editable && "cursor-pointer hover:text-muted transition-colors"
-          )}
+        <span
+          className={`font-sans font-medium text-sm ${editable ? "cursor-pointer hover:text-muted transition-colors" : ""}`}
           onClick={() => editable && setEditing(true)}
           title={editable ? "Click to edit" : undefined}
         >
           {card.content}
-        </div>
+        </span>
       )}
-
-      {/* Link indicator */}
-      {card.linkType && (
-        <div className="text-[11px] text-muted mt-2 font-sans italic">
-          {card.linkType === "contradicts" && "⟷ Contradicts previous point"}
-          {card.linkType === "modifies" && "↻ Modifies previous point"}
-          {card.linkType === "extends" && "→ Extends previous point"}
-        </div>
-      )}
-    </article>
+    </div>
   );
 }
