@@ -87,8 +87,8 @@ export function ExpandPanel({
           {!isGuest && <div className="mt-auto pt-4"><SidebarButton onClick={onLogout}>Sign Out</SidebarButton></div>}
         </nav>
 
-        {/* X close button — positioned at bottom-left of drawer, matching menu icon position */}
-        <div className="flex justify-end px-8 py-5">
+        {/* X close button — positioned at bottom-right of drawer, matching menu icon position */}
+        <div className="flex justify-end px-[19px] py-[19px]">
           <button
             className="text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none"
             onClick={onClose}
