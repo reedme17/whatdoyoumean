@@ -18,8 +18,8 @@ const audioCaptureEngine = new StubAudioCaptureEngine();
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
-    width: 960,
-    height: 720,
+    width: 640,
+    height: 480,
     minWidth: 640,
     minHeight: 480,
     title: "啥意思",

@@ -1,13 +1,13 @@
 /**
  * HomeScreen — editorial idle state.
- * Large serif title, BEGIN button, audio source toggle.
+ * Button morphs into bottom bar using fixed positioning for pixel-perfect animation.
  */
 
-import React from "react";
-import { Button } from "./ui/button.js";
-import { Toggle } from "./ui/toggle.js";
+import React, { useState, useCallback, useRef } from "react";
+import { motion, useAnimation } from "motion/react";
 import { KeyboardIcon } from "./ui/keyboard-icon.js";
 import { Menu } from "lucide-react";
+import type { SttLanguage } from "./ExpandPanel.js";
 
 interface Props {
   onStart: () => void;
@@ -16,49 +16,105 @@ interface Props {
   onToggleAudioSource: () => void;
   onExpand: () => void;
   panelOpen: boolean;
+  sttLanguage: SttLanguage;
 }
 
-export function HomeScreen({ onStart, onTextMode, audioSource, onToggleAudioSource, onExpand, panelOpen }: Props): React.JSX.Element {
-  const isSystem = audioSource === "mic+system";
+export function HomeScreen({ onStart, onTextMode, onExpand, panelOpen }: Props): React.JSX.Element {
+  const [transitioning, setTransitioning] = useState(false);
+  const [morphStyle, setMorphStyle] = useState<React.CSSProperties | null>(null);
+  const controls = useAnimation();
+  const textControls = useAnimation();
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  const handleStart = useCallback(async () => {
+    if (transitioning) return;
+    setTransitioning(true);
+
+    const button = buttonRef.current;
+    if (!button) { onStart(); return; }
+
+    const rect = button.getBoundingClientRect();
+
+    // Switch button to fixed position at its current screen location
+    setMorphStyle({
+      position: "fixed",
+      top: rect.top,
+      left: rect.left,
+      width: rect.width,
+      height: rect.height,
+      borderRadius: 18,
+      zIndex: 9999,
+    });
+
+    // Fade out everything else
+    textControls.start({ opacity: 0, transition: { duration: 0.15 } });
+
+    // Small delay to let fixed positioning apply
+    await new Promise((r) => setTimeout(r, 20));
+
+    // Animate to bottom bar position (bottom of window, full width, 48px tall)
+    await controls.start({
+      top: window.innerHeight - 48,
+      left: 0,
+      width: window.innerWidth,
+      height: 48,
+      borderRadius: "16px 16px 10px 10px",
+      transition: {
+        type: "tween",
+        ease: [0.7, 0.01, 0.23, 1.13],
+        duration: 0.7,
+      },
+    });
+
+    onStart();
+  }, [transitioning, controls, textControls, onStart]);
 
   return (
-    <div className="flex flex-col w-full h-full bg-background text-foreground" role="main" aria-label="Home">
-      <div className="flex flex-col items-center justify-center flex-1 gap-6">
-        <p className="text-xs tracking-[0.2em] uppercase text-muted font-serif">What Do You Mean</p>
+    <div
+      className="flex flex-col items-start justify-between w-full h-full bg-background p-[9px] overflow-hidden"
+      role="main"
+      aria-label="Home"
+    >
+      {/* Top — titlebar spacer */}
+      <motion.div className="w-full shrink-0 h-[14px]" animate={textControls} />
 
-        <Button
-          variant="outline"
-          className="mt-8 px-12 py-3 h-auto text-xs tracking-[0.25em] uppercase font-semibold"
-          onClick={onStart}
-          aria-label="Start listening session"
+      {/* Center — tagline + button group */}
+      <div className="flex flex-col gap-[20px] items-center w-full shrink-0">
+        <motion.p
+          className="font-serif font-normal text-[20px] text-[#60594D]"
+          animate={textControls}
         >
-          Begin
-        </Button>
-
-        <Toggle
-          variant="outline"
-          size="sm"
-          pressed={isSystem}
-          onPressedChange={onToggleAudioSource}
-          className="mt-2 text-xs text-muted"
-          aria-label={isSystem ? "Switch to microphone only" : "Enable system audio capture"}
-        >
-          {isSystem ? "🎤🔊 Mic + System" : "🎤 Microphone Only"}
-        </Toggle>
+          Ready to interpret for you.
+        </motion.p>
+        <div className="flex items-center justify-center gap-[12px]">
+          <motion.button
+            ref={buttonRef}
+            animate={controls}
+            whileTap={transitioning ? undefined : { scale: 0.96 }}
+            className="flex items-center justify-center gap-2 px-4 py-2 min-h-[36px] bg-[#F0EDE8] font-sans font-bold text-sm text-[#5B5449] cursor-pointer border-none hover:bg-[#E8E4DE]"
+            style={morphStyle ?? { borderRadius: 18 }}
+            onClick={handleStart}
+            aria-label="Start listening session"
+          >
+            <motion.span animate={textControls}>Start listening</motion.span>
+          </motion.button>
+          <motion.button
+            className="text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0 shrink-0"
+            onClick={onTextMode}
+            aria-label="Switch to text input mode"
+            title="Text Mode (⌘T)"
+            animate={textControls}
+          >
+            <KeyboardIcon size={20} />
+          </motion.button>
+        </div>
       </div>
 
-      <div className="flex justify-between items-center px-8 py-5">
-        <button
-          className="text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none"
-          onClick={onTextMode}
-          aria-label="Switch to text input mode"
-          title="Text Mode (⌘T)"
-        >
-          <KeyboardIcon size={20} />
-        </button>
+      {/* Bottom — menu icon */}
+      <motion.div className="flex flex-col items-end p-[10px] w-full shrink-0" animate={textControls}>
         {!panelOpen && (
           <button
-            className="text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none"
+            className="text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0"
             onClick={onExpand}
             title="Menu (⌘/)"
             aria-label="Open menu"
@@ -66,7 +122,7 @@ export function HomeScreen({ onStart, onTextMode, audioSource, onToggleAudioSour
             <Menu size={20} />
           </button>
         )}
-      </div>
+      </motion.div>
     </div>
   );
 }

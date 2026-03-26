@@ -48,6 +48,8 @@ interface SocketSessionState {
   silenceTimer: ReturnType<typeof setTimeout> | null;
   /** Timestamp of last received audio chunk */
   lastAudioTime: number;
+  /** STT language preference: "auto" | "zh" | "en" */
+  sttLanguage: string;
 }
 
 /**
@@ -92,6 +94,7 @@ export function setupWebSocketHandlers(
       pendingSegments: [],
       silenceTimer: null,
       lastAudioTime: 0,
+      sttLanguage: "auto",
     };
 
     // Wire transcription engine callbacks
@@ -130,6 +133,11 @@ export function setupWebSocketHandlers(
         state.topicMap = { sessionId: session.id, topics: [], relations: [] };
         state.cards = [];
         state.transcripts = [];
+
+        // Read language preference from client config
+        const lang = (data.config as unknown as Record<string, unknown>)?.language;
+        state.sttLanguage = (lang === "zh+en" || lang === "zh" || lang === "en" || lang === "auto") ? (lang as string) : "zh+en";
+        console.log("[WS] STT language preference:", state.sttLanguage);
 
         state.transcriptionEngine.startTranscription(session.id, "en");
 
@@ -278,7 +286,8 @@ async function processAudioChunk(
   try {
     console.log(`[WS] processAudioChunk: ${Math.round(audioBase64.length / 1024)}KB base64`);
 
-    const { text, latencyMs } = await groqWhisper.transcribeBase64Wav(audioBase64);
+    const whisperLang = (state.sttLanguage === "zh" || state.sttLanguage === "en") ? state.sttLanguage : undefined;
+    const { text, latencyMs } = await groqWhisper.transcribeBase64Wav(audioBase64, whisperLang);
 
     if (!text || text.trim().length === 0) {
       console.log("[WS] Empty transcription — silence detected");

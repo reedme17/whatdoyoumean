@@ -472,3 +472,30 @@ packages/
 - Backend REST: `http://localhost:3000`
 - Backend WS: `ws://localhost:3001`
 - Cerebras model: `llama3.1-8b` (to change model, edit `providers/cerebras.ts`)
+
+---
+
+## Phase 22: STT Language Selection
+
+Added user-configurable language preference for Whisper STT to improve transcription accuracy.
+
+### How It Works
+- User selects language in Settings panel: Auto-detect (default), 中文 (Chinese), or English
+- "Auto" omits the `language` parameter, letting Whisper auto-detect per chunk
+- Setting "zh" or "en" passes the `language` parameter to Groq Whisper API, biasing recognition toward that language
+- Whisper still recognizes other languages within the audio — the parameter acts as a hint, not a hard filter
+
+### Frontend Changes
+- `App.tsx`: Added `sttLanguage` state ("auto" | "zh" | "en"), passed through `session:start` config and to ExpandPanel/HomeScreen
+- `ExpandPanel.tsx`: Settings section now shows radio-style language selector (Auto / 中文 / English)
+- `HomeScreen.tsx`: Shows subtle language indicator below audio source toggle when not "auto"
+
+### Backend Changes
+- `ws/handler.ts`: Reads `language` from session:start config, stores in `SocketSessionState.sttLanguage`, passes to `groqWhisper.transcribeBase64Wav()` — "auto" passes `undefined` (omit param), "zh"/"en" passes the value directly
+- `groq-whisper.ts`: `transcribeBase64Wav` already supported optional `language` parameter — no changes needed
+
+### Changed Files
+- `packages/electron-app/src/renderer/App.tsx`
+- `packages/electron-app/src/renderer/components/ExpandPanel.tsx`
+- `packages/electron-app/src/renderer/components/HomeScreen.tsx`
+- `packages/backend/src/ws/handler.ts`

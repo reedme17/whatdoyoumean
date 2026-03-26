@@ -1,10 +1,12 @@
 /**
- * BottomBar — editorial session controls.
- * Waveform left, flag center (red when active), stop right.
+ * BottomBar — listening session controls with layout animation.
+ * Shares layoutId="session-bar" with HomeScreen button for morph transition.
  */
 
 import React from "react";
-import { Waveform } from "./Waveform.js";
+import { motion } from "motion/react";
+import { MapPinPlusIcon } from "./ui/map-pin-plus-icon.js";
+import { Square } from "lucide-react";
 
 interface Props {
   onFlag: () => void;
@@ -13,34 +15,56 @@ interface Props {
   isCapturing?: boolean;
 }
 
-export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false }: Props): React.JSX.Element {
+export function BottomBar({ onFlag, onStop }: Props): React.JSX.Element {
   return (
-    <div
+    <motion.div
       role="toolbar"
       aria-label="Session controls"
-      className="flex items-center justify-between px-8 py-3 border-t border-border bg-background"
+      className="flex items-center justify-between h-[48px] px-[19px] py-[14px] bg-[#F0EDE8] w-full"
+      style={{ borderRadius: "16px 16px 10px 10px" }}
     >
-      <div role="status" aria-live="polite" className="flex items-center gap-2">
-        <Waveform analyser={analyser} isCapturing={isCapturing} />
-      </div>
+      {/* Left — Listening status */}
+      <motion.div
+        className="flex-1 min-w-0 min-h-px"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.5, duration: 0.25 }}
+      >
+        <span className="font-sans font-medium text-sm text-[#93918E]">
+          Listening...
+        </span>
+      </motion.div>
 
-      <button
-        className="text-lg hover:text-[var(--color-editorial-red)] transition-colors cursor-pointer bg-transparent border-none"
+      {/* Center — Flag/bookmark */}
+      <motion.button
+        className="shrink-0 text-[#93918E] hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0"
         onClick={onFlag}
         title="Flag this moment (⌘B)"
         aria-label="Flag this moment"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.55, duration: 0.25 }}
       >
-        ⚑
-      </button>
+        <MapPinPlusIcon size={20} />
+      </motion.button>
 
-      <button
-        className="text-xs tracking-[0.15em] uppercase text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none font-sans"
-        onClick={onStop}
-        title="Stop session (⌘⇧S)"
-        aria-label="Stop session"
+      {/* Right — End session */}
+      <motion.div
+        className="flex-1 min-w-0 min-h-px flex items-center justify-end gap-[6px]"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.5, duration: 0.25 }}
       >
-        ■ End
-      </button>
-    </div>
+        <button
+          className="flex items-center gap-[6px] text-sm font-sans font-medium text-[#93918E] hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0"
+          onClick={onStop}
+          title="Stop session (⌘⇧S)"
+          aria-label="Stop session"
+        >
+          <Square size={10} fill="currentColor" strokeWidth={0} />
+          End
+        </button>
+      </motion.div>
+    </motion.div>
   );
 }

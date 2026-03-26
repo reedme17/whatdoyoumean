@@ -1,4 +1,6 @@
 import * as React from "react";
+import { useCallback, useRef } from "react";
+import { motion, useAnimation } from "motion/react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "../../lib/utils.js";
 
@@ -11,7 +13,7 @@ const buttonVariants = cva(
         outline: "border border-border bg-transparent hover:bg-accent hover:text-accent-foreground",
         ghost: "hover:bg-accent hover:text-accent-foreground text-muted",
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        normal: "rounded-full bg-secondary text-foreground font-bold hover:bg-border",
+        normal: "rounded-[18px] bg-secondary text-[#5B5449] font-bold hover:bg-border",
       },
       size: {
         default: "h-10 px-6 py-2",
@@ -29,9 +31,31 @@ export interface ButtonProps
     VariantProps<typeof buttonVariants> {}
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, ...props }, ref) => (
-    <button className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props} />
-  )
+  ({ className, variant, size, onClick, ...props }, ref) => {
+    const controls = useAnimation();
+    const pendingClick = useRef<React.MouseEvent<HTMLButtonElement> | null>(null);
+
+    const handleClick = useCallback(
+      async (e: React.MouseEvent<HTMLButtonElement>) => {
+        // Store the event, wait for scale-back animation, then fire onClick
+        pendingClick.current = e;
+        await controls.start({ scale: 1, transition: { duration: 0.15, ease: "easeOut" } });
+        onClick?.(e);
+      },
+      [controls, onClick]
+    );
+
+    return (
+      <motion.button
+        className={cn(buttonVariants({ variant, size, className }))}
+        ref={ref as React.Ref<HTMLButtonElement>}
+        animate={controls}
+        whileTap={{ scale: 0.96 }}
+        onClick={handleClick}
+        {...props}
+      />
+    );
+  }
 );
 Button.displayName = "Button";
 

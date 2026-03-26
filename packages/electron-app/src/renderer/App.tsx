@@ -21,7 +21,7 @@ import { HomeScreen } from "./components/HomeScreen.js";
 import { LiveSession } from "./components/LiveSession.js";
 import { RecapScreen } from "./components/RecapScreen.js";
 import { TextModeScreen } from "./components/TextModeScreen.js";
-import { ExpandPanel, type SessionSummary } from "./components/ExpandPanel.js";
+import { ExpandPanel, type SessionSummary, type SttLanguage } from "./components/ExpandPanel.js";
 import { Onboarding } from "./components/Onboarding.js";
 
 type Screen = "onboarding" | "home" | "live" | "recap" | "text" | "processing";
@@ -60,6 +60,7 @@ export function App(): React.JSX.Element {
   const [speakers] = useState<Map<string, string>>(new Map());
   const sessionStartRef = useRef<number>(0);
   const [audioSource, setAudioSource] = useState<"mic" | "mic+system">("mic");
+  const [sttLanguage, setSttLanguage] = useState<SttLanguage>("zh+en");
   const [pendingPreview, setPendingPreview] = useState<string>("");
 
   // ── Text mode state ──
@@ -164,7 +165,7 @@ export function App(): React.JSX.Element {
     goToScreen("live");
 
     // Notify backend to start session
-    send({ type: "session:start", config: { mode: "online", sampleRate: 16000, channels: 1, noiseSuppression: true, autoGain: true } });
+    send({ type: "session:start", config: { mode: "online", sampleRate: 16000, channels: 1, noiseSuppression: true, autoGain: true, language: sttLanguage } });
 
     // Start real audio capture in renderer (getUserMedia → base64 WAV → WS)
     try {
@@ -245,7 +246,7 @@ export function App(): React.JSX.Element {
     setTextRecs([]);
 
     // Start a text-mode session first, then submit text
-    send({ type: "session:start", config: { mode: "offline", sampleRate: 16000, channels: 1, noiseSuppression: false, autoGain: false } });
+    send({ type: "session:start", config: { mode: "offline", sampleRate: 16000, channels: 1, noiseSuppression: false, autoGain: false, language: sttLanguage } });
 
     // Small delay to let session initialize, then submit text
     setTimeout(() => {
@@ -373,6 +374,7 @@ export function App(): React.JSX.Element {
           onExpand={() => setPanelOpen(true)}
           panelOpen={panelOpen}
           onToggleAudioSource={() => setAudioSource((s) => s === "mic" ? "mic+system" : "mic")}
+          sttLanguage={sttLanguage}
         />
       )}
 
@@ -436,6 +438,8 @@ export function App(): React.JSX.Element {
         }}
         onLogin={handleLogin}
         onLogout={handleLogout}
+        sttLanguage={sttLanguage}
+        onSttLanguageChange={setSttLanguage}
       />
 
 
