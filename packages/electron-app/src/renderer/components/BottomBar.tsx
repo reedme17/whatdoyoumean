@@ -41,6 +41,7 @@ export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false
   const textRef = useRef<HTMLSpanElement>(null);
   const prevPreviewRef = useRef("");
   const animatingRef = useRef(false);
+  const lastHeightRef = useRef(0);
 
   useEffect(() => {
     const prev = prevPreviewRef.current;
@@ -54,6 +55,7 @@ export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false
     // Text appeared — expand
     if (!prev && curr) {
       animatingRef.current = true;
+      lastHeightRef.current = 0;
       // Set content first so we can measure
       gsap.set(block, { height: "auto", overflow: "hidden", visibility: "visible" });
       const h = block.offsetHeight;
@@ -96,6 +98,23 @@ export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false
       tl.to(outer, { gap: 0, duration: 0.8, ease: "expo.out" }, 0.1);
     }
   }, [pendingPreview]);
+
+  // Animate height changes when pending text grows (more lines)
+  useEffect(() => {
+    const block = pendingBlockRef.current;
+    if (!block) return;
+    const ro = new ResizeObserver(() => {
+      if (animatingRef.current) return;
+      const h = block.offsetHeight;
+      const prev = lastHeightRef.current;
+      if (prev > 0 && h !== prev && block.style.visibility !== "hidden") {
+        gsap.fromTo(block, { height: prev }, { height: h, duration: 0.4, ease: "expo.out", onComplete: () => gsap.set(block, { height: "auto" }) });
+      }
+      lastHeightRef.current = h;
+    });
+    ro.observe(block);
+    return () => ro.disconnect();
+  }, []);
 
   // Determine text to show (current or keep last during exit animation)
   const textToShow = pendingPreview || prevPreviewRef.current || "";
@@ -158,7 +177,7 @@ export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false
             title="Stop session (⌘⇧S)"
             aria-label="Stop session"
           >
-            <Square size={10} fill="currentColor" strokeWidth={0} className="transition-transform group-hover:scale-[1.2]" />
+            <Square size={10} fill="currentColor" strokeWidth={0} className="group-hover:scale-[1.2]" style={{ transition: "transform 225ms ease-out" }} />
             End
           </button>
         </div>
