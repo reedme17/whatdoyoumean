@@ -287,6 +287,7 @@ async function processAudioChunk(
     console.log(`[WS] processAudioChunk: ${Math.round(audioBase64.length / 1024)}KB base64`);
 
     const whisperLang = (state.sttLanguage === "zh" || state.sttLanguage === "en") ? state.sttLanguage : undefined;
+    console.log("[WS] whisperLang:", whisperLang, "state.sttLanguage:", state.sttLanguage);
     const { text, latencyMs } = await groqWhisper.transcribeBase64Wav(audioBase64, whisperLang);
 
     if (!text || text.trim().length === 0) {
