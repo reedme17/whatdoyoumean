@@ -10,6 +10,8 @@ import { Button } from "./ui/button.js";
 import { HistoryView } from "./HistoryView.js";
 import { XIcon } from "./ui/x-icon.js";
 
+export type SttLanguage = "zh+en" | "en" | "zh" | "auto";
+
 export interface SessionSummary {
   id: string;
   date: string;
@@ -27,12 +29,21 @@ interface Props {
   onOpenSession: (sessionId: string) => void;
   onLogin: (userId: string) => void;
   onLogout: () => void;
+  sttLanguage: SttLanguage;
+  onSttLanguageChange: (lang: SttLanguage) => void;
 }
 
 type Section = "none" | "signin" | "profile" | "history" | "settings" | "terminology" | "about";
 
+const STT_OPTIONS: [SttLanguage, string][] = [
+  ["zh+en", "中英 (default)"],
+  ["en", "English"],
+  ["zh", "中文"],
+  ["auto", "Auto-detect"],
+];
+
 export function ExpandPanel({
-  open, onClose, userId, isGuest, sessions, onOpenSession, onLogin, onLogout,
+  open, onClose, userId, isGuest, sessions, onOpenSession, onLogin, onLogout, sttLanguage, onSttLanguageChange,
 }: Props): React.JSX.Element {
   const [activeSection, setActiveSection] = useState<Section>("none");
   const toggle = (s: Section) => setActiveSection((p) => (p === s ? "none" : s));
@@ -69,8 +80,18 @@ export function ExpandPanel({
           <SidebarButton active={activeSection === "settings"} onClick={() => toggle("settings")}>Settings</SidebarButton>
           {activeSection === "settings" && (
             <div className="px-3 py-2 text-xs text-muted font-sans leading-relaxed">
-              <div className="mb-1">Language: English / 中文</div>
-              <div>STT: Auto</div>
+              <div className="mb-2 font-medium text-foreground">STT Language</div>
+              <div className="flex flex-col gap-1">
+                {STT_OPTIONS.map(([val, label]) => (
+                  <button
+                    key={val}
+                    className={`text-left text-xs px-2 py-1 rounded-md cursor-pointer border-none bg-transparent transition-colors ${sttLanguage === val ? "text-foreground font-medium" : "text-muted hover:text-foreground"}`}
+                    onClick={() => onSttLanguageChange(val)}
+                  >
+                    {sttLanguage === val ? "● " : "○ "}{label}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
           <SidebarButton active={activeSection === "terminology"} locked={isGuest} onClick={() => toggle("terminology")}>Terminology</SidebarButton>
