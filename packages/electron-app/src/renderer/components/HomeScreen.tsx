@@ -66,13 +66,13 @@ export function HomeScreen({ onStart, onTextMode, onExpand, panelOpen }: Props):
     await new Promise((r) => setTimeout(r, 20));
 
     // Animate to bottom bar position (bottom of window, full width)
-    // BottomBar is 148px tall with -mb-[100px], so top edge is at innerHeight - 48
+    // BottomBar is ~158px tall with -mb-[100px], so top edge is at innerHeight - 60
     // but the element itself extends 100px below. Match that exactly.
     await controls.start({
-      top: window.innerHeight - 48,
+      top: window.innerHeight - 60,
       left: 0,
       width: window.innerWidth,
-      height: 148,
+      height: 160,
       borderRadius: "16px 16px 10px 10px",
       transition: {
         type: "tween",
@@ -86,7 +86,7 @@ export function HomeScreen({ onStart, onTextMode, onExpand, panelOpen }: Props):
 
   return (
     <div
-      className="flex flex-col items-start justify-between w-full h-full bg-background p-[9px] overflow-hidden"
+      className="flex flex-col items-start justify-between w-full h-full bg-background p-[10px] overflow-hidden"
       role="main"
       aria-label="Home"
     >

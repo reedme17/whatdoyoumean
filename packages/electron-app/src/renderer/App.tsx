@@ -24,7 +24,7 @@ import { TextModeScreen } from "./components/TextModeScreen.js";
 import { ExpandPanel, type SessionSummary, type SttLanguage } from "./components/ExpandPanel.js";
 import { Onboarding } from "./components/Onboarding.js";
 
-type Screen = "onboarding" | "home" | "live" | "recap" | "text" | "processing";
+type Screen = "onboarding" | "home" | "live" | "recap" | "text" | "processing" ;
 
 /** Minimal ElectronAPI type for window.electronAPI */
 interface ElectronAPI {
@@ -411,6 +411,7 @@ export function App(): React.JSX.Element {
           onEditCard={handleEditCard}
         />
       )}
+
 
       {screen === "text" && (
         <TextModeScreen

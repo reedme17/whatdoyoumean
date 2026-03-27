@@ -645,3 +645,50 @@ Added GSAP-powered animations for the BottomBar pending text expand/collapse.
 - `packages/electron-app/src/renderer/components/ExpandPanel.tsx` (X icon padding alignment)
 - `packages/electron-app/src/renderer/components/BottomBar.tsx` (ResizeObserver height animation, tweening guard, End hover 400ms)
 - `packages/electron-app/src/renderer/components/LiveSession.tsx` (overflow-hidden)
+
+---
+
+## Phase 27: ExpandPanel Redesign, RecapScreen, History, Terminology
+
+### ExpandPanel Overhaul
+- Sign In button: uses global `normal` variant (bg #F0EDE8, text #5B5449, rounded-18, font-bold), `self-start` for content-width, `ml-3` to align left edge with SidebarButton text
+- STT language selector restored: interactive radio-style (zh+en, en, zh, auto) replacing static placeholder text
+- Settings and About: animated chevron icon (rotates -90° from left-pointing to down-pointing, 0.25s ease-out CSS transition)
+- Settings and About content: max-height accordion animation (0→200px + opacity, 0.25s ease-out). Tried CSS grid `0fr→1fr` first but it failed intermittently when toggling between sections rapidly
+- History and Terminology: click expands drawer panel to full width with same animation as vaul drawer open (0.5s cubic-bezier(0.32, 0.72, 0, 1)). Content switches to full-screen page with title + X close button. Close slides entire panel right (no intermediate menu state visible)
+- X close button: 20px from right and bottom edges, matching menu icon position
+
+### RecapScreen Redesign (from Figma)
+- Title "Session recap": Lora 20px #60594D, pl-20 pt-12
+- Cards grouped by speaker, same card format as LiveSession (category italic 11px + content medium 14px)
+- Content area: px-20 outer + px-20 inner = 40px left padding for cards
+- Bottom bar: "New session" ghost button (no background, plain text) + X close icon, px-20 pb-20 pt-12
+- X icon has 300ms pointer-events-none on mount to prevent hover flash from End button overlap
+
+### Global Padding Standardization
+- All icon/button edge distances standardized to 20px (was 19px): HomeScreen outer padding, BottomBar px/py, ExpandPanel X icon, RecapScreen bottom bar
+- HomeScreen morph animation endpoint updated to match (height 160, top innerHeight - 60)
+
+### Other Changes
+- Onboarding button text: "Start" → "Enter"
+- Global Button default size: h-10 px-6 → min-h-[36px] px-4 (matches Start listening)
+- End button hover: 400ms ease-out transition
+- BottomBar pending height growth: GSAP ResizeObserver animation with tweening guard
+- LiveSession: overflow-hidden to clip BottomBar sink area from scroll
+- New icon components: chevron-icon.tsx (animated rotation), chevron-left-icon.tsx, chevron-down-icon.tsx (unused, kept)
+- HistoryPage.tsx created (standalone, unused — history now lives inside ExpandPanel)
+
+### Changed Files
+- `packages/electron-app/src/renderer/components/ExpandPanel.tsx` (major rewrite)
+- `packages/electron-app/src/renderer/components/RecapScreen.tsx` (redesign from Figma)
+- `packages/electron-app/src/renderer/components/HomeScreen.tsx` (padding, animation endpoint)
+- `packages/electron-app/src/renderer/components/BottomBar.tsx` (padding, GSAP height, End hover)
+- `packages/electron-app/src/renderer/components/LiveSession.tsx` (overflow-hidden)
+- `packages/electron-app/src/renderer/components/Onboarding.tsx` (Enter text)
+- `packages/electron-app/src/renderer/components/ui/button.tsx` (default size)
+- `packages/electron-app/src/renderer/components/ui/chevron-icon.tsx` (new)
+- `packages/electron-app/src/renderer/components/ui/chevron-left-icon.tsx` (new)
+- `packages/electron-app/src/renderer/components/ui/chevron-down-icon.tsx` (new)
+- `packages/electron-app/src/renderer/components/HistoryPage.tsx` (new, unused)
+- `packages/electron-app/src/renderer/App.tsx` (removed unused history screen)
+- `packages/backend/src/ws/handler.ts` (whisperLang debug log)

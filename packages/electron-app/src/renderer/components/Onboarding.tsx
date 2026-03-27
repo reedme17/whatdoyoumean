@@ -38,7 +38,7 @@ export function Onboarding({ onComplete }: Props): React.JSX.Element {
 
       {/* Start button — pill shape */}
       <Button variant="normal" onClick={onComplete}>
-        Start
+        Enter
       </Button>
     </div>
   );

@@ -131,8 +131,8 @@ export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false
       ref={outerRef}
       role="toolbar"
       aria-label="Session controls"
-      className="flex flex-col items-start px-[19px] py-[14px] bg-[#F0EDE8] w-full -mb-[100px] relative overflow-visible"
-      style={{ borderRadius: "16px 16px 10px 10px", paddingBottom: 114, gap: 0 }}
+      className="flex flex-col items-start px-[20px] py-[20px] bg-[#F0EDE8] w-full -mb-[100px] relative overflow-visible"
+      style={{ borderRadius: "16px 16px 10px 10px", paddingBottom: 120, gap: 0 }}
     >
       {/* Pending block — always in DOM, hidden when empty */}
       <div

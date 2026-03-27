@@ -1,12 +1,12 @@
 /**
  * RecapScreen — editorial post-session review.
- * Serif heading, editable pull-quote cards, flagged moments.
+ * Matches Figma design: Session recap title, speaker blocks with cards, bottom bar.
  */
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import type { CoreMeaningCard, Recommendation, Bookmark } from "@wdym/shared";
 import { CoreMeaningCardView } from "./CoreMeaningCard.js";
-import { Separator } from "./ui/separator.js";
+import { XIcon } from "./ui/x-icon.js";
 
 interface Props {
   cards: CoreMeaningCard[];
@@ -20,83 +20,80 @@ interface Props {
 
 export function RecapScreen({
   cards,
-  recommendations,
   bookmarks,
   speakers,
   onExport,
   onClose,
   onEditCard,
 }: Props): React.JSX.Element {
+  // Suppress hover on X icon for 300ms after mount (End button overlaps X position)
+  const [xReady, setXReady] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setXReady(true), 300); return () => clearTimeout(t); }, []);
+
+  // Group cards by speaker
+  const speakerGroups: { speaker: string; cards: CoreMeaningCard[] }[] = [];
+  for (const card of cards) {
+    const speaker = speakers.get(card.sourceSegmentIds[0] ?? "") ?? "Speaker 1";
+    const last = speakerGroups[speakerGroups.length - 1];
+    if (last && last.speaker === speaker) {
+      last.cards.push(card);
+    } else {
+      speakerGroups.push({ speaker, cards: [card] });
+    }
+  }
+
   return (
     <div className="flex flex-col h-full bg-background" role="main" aria-label="Session recap">
-      {/* Top bar */}
-      <div className="flex items-center justify-between px-8 py-5">
-        <h1 className="font-serif text-2xl font-normal">Session Recap</h1>
-        <div className="flex gap-4">
-          <button
-            className="text-xs tracking-[0.15em] uppercase text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none font-sans"
-            onClick={onExport}
-            title="Export (⌘E)"
-            aria-label="Export session"
-          >
-            Export
-          </button>
-          <button
-            className="text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none"
-            onClick={onClose}
-            title="Close"
-            aria-label="Close recap"
-          >
-            ✕
-          </button>
+      {/* Content area */}
+      <div className="flex-1 flex flex-col overflow-y-auto">
+        {/* Title */}
+        <div className="pl-[20px] pt-[12px] shrink-0">
+          <h1 className="font-serif font-normal text-[20px] text-[#60594D]">Session recap</h1>
+        </div>
+
+        {/* Speaker blocks */}
+        <div className="flex flex-col gap-[10px] px-[20px]">
+          {speakerGroups.map((group, gi) => (
+            <div key={gi} className="flex flex-col gap-[10px] px-[20px] py-[12px]">
+              <div className="flex items-baseline gap-[10px]">
+                <span className="font-sans font-semibold text-sm text-[#60594D]">{group.speaker}</span>
+              </div>
+              <div className="flex flex-col gap-[8px]">
+                {group.cards.map((card, i) => (
+                  <React.Fragment key={card.id}>
+                    {i > 0 && <div className="w-full h-px bg-border" />}
+                    <CoreMeaningCardView card={card} />
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {cards.length === 0 && (
+            <div className="text-muted text-sm text-center mt-16 font-serif italic">
+              No cards in this session.
+            </div>
+          )}
         </div>
       </div>
-      <Separator />
 
-      {/* Cards */}
-      <div className="flex-1 overflow-y-auto px-8 py-4">
-        {cards.map((card) => (
-          <CoreMeaningCardView
-            key={card.id}
-            card={card}
-            speakerName={speakers.get(card.sourceSegmentIds[0] ?? "") ?? "Speaker"}
-            editable
-            onEdit={onEditCard}
-          />
-        ))}
-
-        {cards.length === 0 && (
-          <div className="text-muted text-sm text-center mt-16 font-serif italic">
-            No cards in this session.
-          </div>
-        )}
+      {/* Bottom bar */}
+      <div className="flex items-center justify-between px-[20px] pt-[12px] pb-[20px] shrink-0">
+        <button
+          className="font-sans font-bold text-sm text-[#5B5449] hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0"
+          onClick={onClose}
+        >
+          New session
+        </button>
+        <button
+          className="text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none"
+          style={xReady ? undefined : { pointerEvents: "none" }}
+          onClick={onClose}
+          aria-label="Close recap"
+        >
+          <XIcon size={20} />
+        </button>
       </div>
-
-      {/* Flagged moments */}
-      {bookmarks.length > 0 && (
-        <>
-          <Separator />
-          <div className="px-8 py-3 text-xs text-muted font-sans">
-            <span className="font-semibold text-[var(--color-editorial-red)]">⚑</span>
-            <span className="ml-2 tracking-[0.1em] uppercase">Flagged moments</span>
-            <div className="flex flex-wrap gap-3 mt-2">
-              {bookmarks.map((bm) => (
-                <span key={bm.id} className="text-xs text-muted">
-                  {formatTimestamp(bm.timestamp)}
-                  {bm.note ? ` — ${bm.note}` : ""}
-                </span>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
     </div>
   );
-}
-
-function formatTimestamp(ms: number): string {
-  const totalSec = Math.floor(ms / 1000);
-  const min = Math.floor(totalSec / 60);
-  const sec = totalSec % 60;
-  return `${min}:${sec.toString().padStart(2, "0")}`;
 }
