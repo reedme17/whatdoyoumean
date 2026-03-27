@@ -273,7 +273,26 @@ export function setupWebSocketHandlers(
 const groqWhisper = new GroqWhisperProvider();
 
 /** Silence duration (ms) before finalizing accumulated text into a card */
-const SILENCE_THRESHOLD_MS = 5000;
+const SILENCE_THRESHOLD_MS = 3000;
+const PUNCTUATION_MIN_CHARS = 20;
+const MAX_PENDING_CHARS = 120;
+
+/** Check if pending text should be finalized based on punctuation or length */
+function checkSegmentationTriggers(text: string): string | null {
+  const len = text.length;
+
+  // Rule 3: Force finalize if text is too long
+  if (len > MAX_PENDING_CHARS) return "max_length";
+
+  // Rule 2: Finalize on sentence-ending punctuation when text is long enough
+  if (len > PUNCTUATION_MIN_CHARS) {
+    // Check if text ends with sentence-ending punctuation (allowing trailing spaces)
+    const trimmed = text.trimEnd();
+    if (/[。！？.!?]$/.test(trimmed)) return "punctuation";
+  }
+
+  return null;
+}
 
 async function processAudioChunk(
   socket: Socket,
@@ -326,7 +345,16 @@ async function processAudioChunk(
     // Send preview of accumulated text to frontend
     emitServerEvent(socket, { type: "pending:preview", text: state.pendingText });
 
-    // Reset silence timer — will fire after 5s of no new transcription
+    // Check for immediate finalization triggers
+    const shouldFinalize = checkSegmentationTriggers(state.pendingText);
+    if (shouldFinalize) {
+      if (state.silenceTimer) { clearTimeout(state.silenceTimer); state.silenceTimer = null; }
+      console.log(`[WS] Segmentation trigger: ${shouldFinalize}`);
+      await finalizePendingText(socket, state, analyzer, recommender, visualizer);
+      return;
+    }
+
+    // Reset silence timer — will fire after 3s of no new transcription
     if (state.silenceTimer) {
       clearTimeout(state.silenceTimer);
     }

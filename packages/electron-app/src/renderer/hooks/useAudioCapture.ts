@@ -11,7 +11,7 @@ import { useRef, useState, useCallback } from "react";
 /** Desired output sample rate for Groq Whisper */
 const TARGET_SAMPLE_RATE = 16000;
 /** Chunk duration in seconds */
-const CHUNK_DURATION_SEC = 4;
+const CHUNK_DURATION_SEC = 2;
 
 interface UseAudioCaptureOptions {
   /** WebSocket send function from useSocket */

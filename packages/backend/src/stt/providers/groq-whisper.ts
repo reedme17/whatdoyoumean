@@ -113,11 +113,24 @@ export class GroqWhisperProvider implements STTProvider {
       file,
       model: "whisper-large-v3-turbo",
       ...(language ? { language } : {}), // omit language to let Whisper auto-detect
-      response_format: "json",
+      response_format: "verbose_json",
     });
     const latencyMs = Date.now() - start;
 
-    console.log(`[GroqWhisper] Transcribed in ${latencyMs}ms: "${response.text.slice(0, 80)}"`);
+    // Filter low-confidence segments using no_speech_prob and avg_logprob
+    const segments = (response as unknown as { segments?: { no_speech_prob?: number; avg_logprob?: number }[] }).segments ?? [];
+    const NO_SPEECH_THRESHOLD = 0.7;
+    const AVG_LOGPROB_THRESHOLD = -1.0;
+    const hasLowConfidence = segments.length > 0 && segments.every(
+      (s) => (s.no_speech_prob ?? 0) > NO_SPEECH_THRESHOLD || (s.avg_logprob ?? 0) < AVG_LOGPROB_THRESHOLD
+    );
+
+    if (hasLowConfidence) {
+      console.log(`[GroqWhisper] Low confidence — dropping. no_speech_prob=${segments[0]?.no_speech_prob?.toFixed(3)}, avg_logprob=${segments[0]?.avg_logprob?.toFixed(3)}, text="${response.text.slice(0, 40)}"`);
+      return { text: "", latencyMs };
+    }
+
+    console.log(`[GroqWhisper] Transcribed in ${latencyMs}ms: "${response.text.slice(0, 80)}" (no_speech=${segments[0]?.no_speech_prob?.toFixed(3)}, logprob=${segments[0]?.avg_logprob?.toFixed(3)})`);
     return { text: response.text, latencyMs };
   }
 

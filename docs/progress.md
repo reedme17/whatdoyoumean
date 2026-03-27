@@ -692,3 +692,38 @@ Added GSAP-powered animations for the BottomBar pending text expand/collapse.
 - `packages/electron-app/src/renderer/components/HistoryPage.tsx` (new, unused)
 - `packages/electron-app/src/renderer/App.tsx` (removed unused history screen)
 - `packages/backend/src/ws/handler.ts` (whisperLang debug log)
+
+---
+
+## Phase 28: Onboarding Animation, STT Confidence, Smart Segmentation
+
+### Onboarding Enter Animation
+- Click Enter → button background color (#F0EDE8) expands as a circle from button center to cover entire screen (GSAP timeline)
+- Phase 1: circle expands (0.8s, power2.in — slow start, fast end)
+- Phase 2: color fades to background (#FAF8F5, 0.8s), then screen transitions to HomeScreen
+- Implementation: fixed-position overlay div, GSAP `set` for initial circle at button center, `to` for width/height expansion using `Math.hypot` to calculate max radius needed
+
+### Animation Optimization Lessons Learned
+- **Morph animation endpoint mismatch**: Button-to-BottomBar morph animation had a "jump" at the end because the animation endpoint (height/top) didn't match BottomBar's actual rendered size. Root cause: BottomBar's `paddingBottom` inline style overrides Tailwind `py-*`, making actual height different from assumed. Fix: calculate actual height from padding-top + content + paddingBottom, subtract -mb offset for visible height
+- **5x slow-motion debugging**: Temporarily multiplying animation duration by 5x is essential for diagnosing position mismatches — at normal speed they look like "jumps" but at 5x you can see exactly where the discrepancy is
+- **CSS grid accordion unreliable**: `grid-template-rows: 0fr → 1fr` transition works in theory but fails intermittently when React re-mounts the container (e.g., switching between panel views). The grid div mounts with the "open" value and no transition occurs. Fix: use `max-height: 0 → 200px` + `opacity` transition instead — more reliable because max-height always transitions even on fresh mount
+- **ResizeObserver + GSAP feedback loop**: Using ResizeObserver to detect height changes and animate them with GSAP creates an infinite loop — GSAP changes height → observer fires → triggers new animation → repeat. Fix: add a `tweening` boolean guard that skips observer callbacks while GSAP is mid-animation
+- **pointer-events-none for hover suppression**: When a new screen mounts with an interactive element at the cursor position, CSS `:hover` fires immediately. Use `pointer-events: none` for 300ms after mount to suppress this (RecapScreen X icon overlapping End button position)
+
+### STT Confidence Filtering
+- Changed Groq Whisper from `response_format: "json"` to `"verbose_json"` to get segment-level `no_speech_prob` and `avg_logprob`
+- Segments with `no_speech_prob > 0.7` OR `avg_logprob < -1.0` are dropped (return empty string)
+- Reduces phantom transcriptions from background noise
+
+### Smart Segmentation (Punctuation + Length + Silence)
+- **Rule 1**: Silence timeout reduced from 5s to 3s
+- **Rule 2**: Sentence-ending punctuation (。！？.!?) + pendingText > 20 chars → immediate finalize
+- **Rule 3**: pendingText > 120 chars → force finalize
+- Audio chunk interval reduced from 4s to 2s for more responsive silence detection
+- `checkSegmentationTriggers()` function runs after each new transcription, before silence timer reset
+
+### Changed Files
+- `packages/electron-app/src/renderer/components/Onboarding.tsx` (GSAP circle expand animation)
+- `packages/backend/src/stt/providers/groq-whisper.ts` (verbose_json, confidence filtering)
+- `packages/backend/src/ws/handler.ts` (segmentation rules, 3s silence, debug logs)
+- `packages/electron-app/src/renderer/hooks/useAudioCapture.ts` (2s chunk interval)
