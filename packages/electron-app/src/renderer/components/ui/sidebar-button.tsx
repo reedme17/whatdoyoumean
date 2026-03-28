@@ -1,6 +1,6 @@
 /**
- * SidebarButton — shadcn sidebar-style menu item.
- * Full-width, left-aligned, subtle hover, active state.
+ * SidebarButton — menu item for ExpandPanel drawer.
+ * Colors match design tokens: #60594D default, #5B5449 active.
  */
 
 import React from "react";
@@ -16,11 +16,10 @@ const SidebarButton = React.forwardRef<HTMLButtonElement, SidebarButtonProps>(
     <button
       ref={ref}
       className={cn(
-        "flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-sans transition-colors",
-        "hover:bg-accent hover:text-accent-foreground",
-        active && "bg-accent text-accent-foreground font-medium",
+        "flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-sans transition-colors cursor-pointer",
+        "text-[#60594D] hover:bg-[#F0EDE8] hover:text-[#5B5449]",
+        active && "bg-[#F0EDE8] text-[#5B5449] font-semibold",
         locked && "opacity-40 cursor-not-allowed",
-        !active && !locked && "text-muted",
         className
       )}
       disabled={locked}

@@ -14,6 +14,7 @@ const buttonVariants = cva(
         ghost: "hover:bg-accent hover:text-accent-foreground text-muted",
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         normal: "rounded-[18px] bg-secondary text-[#5B5449] font-bold hover:bg-border",
+        small: "rounded-full bg-[#F0EDE8] text-[#5B5449] text-[10px] font-medium !px-[8px] !h-[20px] !min-h-0 !py-0 hover:bg-[#E8E4DE]",
       },
       size: {
         default: "min-h-[36px] px-4 py-2",

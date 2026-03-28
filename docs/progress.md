@@ -727,3 +727,54 @@ Added GSAP-powered animations for the BottomBar pending text expand/collapse.
 - `packages/backend/src/stt/providers/groq-whisper.ts` (verbose_json, confidence filtering)
 - `packages/backend/src/ws/handler.ts` (segmentation rules, 3s silence, debug logs)
 - `packages/electron-app/src/renderer/hooks/useAudioCapture.ts` (2s chunk interval)
+
+---
+
+## Phase 29: Text Mode Multi-Card Analysis Fix
+
+Fixed langHint leaking into LLM output as card content, and JSON cutoff when LLM returns many cards.
+
+### LangHint Leakage Fix
+- `analyzeMulti()` had `hasChinese`/`langHint` logic that appended `⚠ LANGUAGE: The text is in Chinese. ALL content MUST be in Chinese (中文).` to the user prompt
+- LLM regurgitated this hint as the last card's content: "语言提示应该是中文（中文）"
+- Fix: removed `langHint` from user prompt entirely — `MULTI_SYSTEM_PROMPT` already says "content MUST be in the SAME LANGUAGE as the input text"
+
+### JSON Cutoff Fix
+- System prompt said "Return 1-10 items" — when LLM tried to return >10, JSON array got truncated mid-output, `JSON.parse` failed, fell back to single card
+- `maxTokens: 500` was too small for large JSON arrays
+- Fix: removed hard "1-10" limit from prompt (now "as many as needed"), increased `maxTokens` to 1000
+
+### Chinese Over-Segmentation Fix
+- Prompt said "identify ALL distinct points" — LLM split every comma-separated clause into its own card
+- Fix: changed to "identify the key distinct points", added "Merge related clauses into ONE item. Do NOT split on commas or conjunctions", added "Prefer fewer, richer items over many fragments"
+
+### Changed Files
+- `packages/backend/src/semantic/analyzer.ts` (analyzeMulti prompt, maxTokens, langHint removal)
+
+---
+
+## Phase 30: Category System Overhaul
+
+Replaced 6 meaning categories with a cleaner set. Removed `factual_statement` (→ `fact`) and `disagreement` (subsumed by `opinion`), added `proposal`.
+
+### New Categories
+- `fact` — factual statement (was `factual_statement`)
+- `opinion` — opinions, agreements, disagreements, clarifications
+- `question` — questions
+- `decision` — decisions made
+- `action_item` — to-do items
+- `proposal` — suggestions with actionable direction
+
+### UI Changes
+- Category badge label "Action" → "To do"
+- Badge width fixed at 48px (`w-[48px]`) for uniform alignment across all cards
+- Updated `categoryLabels` in CoreMeaningCard component
+
+### Files Changed
+- `packages/shared/src/card.ts` (MeaningCategory type)
+- `packages/shared/src/i18n/en.json`, `zh.json` (i18n labels)
+- `packages/backend/src/semantic/analyzer.ts` (VALID_CATEGORIES, prompts, fallback defaults)
+- `packages/backend/src/visualization/engine.ts` (DIAGRAM_CATEGORIES, formatCategory)
+- `packages/electron-app/src/renderer/components/CoreMeaningCard.tsx` (labels, fixed width)
+- `packages/electron-app/src/renderer/App.tsx` (fallback category)
+- All test files updated: analyzer.test.ts, visualization/engine.test.ts, ws/handler.test.ts, session/routes.test.ts, session/archive.test.ts, memory/service.test.ts

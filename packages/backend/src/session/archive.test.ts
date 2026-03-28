@@ -30,7 +30,7 @@ function makeArchive(overrides?: Partial<{ userId: string; topicSummary: string;
     ],
     cards: [
       {
-        id: "c1", sessionId: "s1", category: "factual_statement",
+        id: "c1", sessionId: "s1", category: "fact",
         content: overrides?.cardContent ?? "Test card content",
         sourceSegmentIds: ["t1"], linkedCardIds: [], linkType: null,
         topicId: "topic1", visualizationFormat: "concise_text",

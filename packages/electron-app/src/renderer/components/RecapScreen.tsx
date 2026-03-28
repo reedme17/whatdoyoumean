@@ -16,6 +16,9 @@ interface Props {
   onExport: () => void;
   onClose: () => void;
   onEditCard: (cardId: string, content: string) => void;
+  title?: string;
+  actionLabel?: string;
+  showSpeakers?: boolean;
 }
 
 export function RecapScreen({
@@ -25,6 +28,9 @@ export function RecapScreen({
   onExport,
   onClose,
   onEditCard,
+  title = "Session recap",
+  actionLabel = "New session",
+  showSpeakers = true,
 }: Props): React.JSX.Element {
   // Suppress hover on X icon for 300ms after mount (End button overlaps X position)
   const [xReady, setXReady] = useState(false);
@@ -48,7 +54,7 @@ export function RecapScreen({
       <div className="flex-1 flex flex-col overflow-y-auto">
         {/* Title */}
         <div className="pl-[20px] pt-[12px] shrink-0">
-          <h1 className="font-serif font-normal text-[20px] text-[#60594D]">Session recap</h1>
+          <h1 className="font-serif font-normal text-[20px] text-[#60594D]">{title}</h1>
         </div>
 
         {/* Speaker blocks */}
@@ -56,7 +62,7 @@ export function RecapScreen({
           {speakerGroups.map((group, gi) => (
             <div key={gi} className="flex flex-col gap-[10px] px-[20px] py-[12px]">
               <div className="flex items-baseline gap-[10px]">
-                <span className="font-sans font-semibold text-sm text-[#60594D]">{group.speaker}</span>
+                {showSpeakers && <span className="font-sans font-semibold text-sm text-[#60594D]">{group.speaker}</span>}
               </div>
               <div className="flex flex-col gap-[8px]">
                 {group.cards.map((card, i) => (
@@ -83,7 +89,7 @@ export function RecapScreen({
           className="font-sans font-bold text-sm text-[#5B5449] hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0"
           onClick={onClose}
         >
-          New session
+          {actionLabel}
         </button>
         <button
           className="text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none"

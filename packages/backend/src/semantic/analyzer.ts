@@ -42,12 +42,12 @@ const MAX_CHINESE_CHARS = 50;
 const ANALYSIS_TIMEOUT_MS = 3000;
 
 const VALID_CATEGORIES: MeaningCategory[] = [
-  "factual_statement",
+  "fact",
   "opinion",
   "question",
   "decision",
   "action_item",
-  "disagreement",
+  "proposal",
 ];
 
 // ── SemanticAnalyzer ─────────────────────────────────────────────
@@ -122,6 +122,59 @@ export class SemanticAnalyzer {
    * Detect whether a new card duplicates an existing one.
    * Returns a MergeDecision indicating whether to merge and into which card.
    */
+  async analyzeMulti(text: string, languageCode: string): Promise<CoreMeaningCard[]> {
+    console.log("[SemanticAnalyzer] analyzeMulti calling LLM...");
+    const response = await this.llm.complete({
+      taskType: "semantic_analysis",
+      messages: [
+        { role: "system", content: MULTI_SYSTEM_PROMPT },
+        { role: "user", content: `Analyze this text and extract all distinct points:\n\n${text}` },
+      ],
+      maxTokens: 1000,
+      temperature: 0.3,
+      stream: false,
+      timeoutMs: 10000,
+    });
+
+    try {
+      console.log("[SemanticAnalyzer] analyzeMulti raw response:", response.content.slice(0, 300));
+      const raw = response.content.replace(/```json\n?|```/g, "").trim();
+      const items = JSON.parse(raw) as { content: string; category: string }[];
+      if (!Array.isArray(items) || items.length === 0) throw new Error("Empty array");
+
+      return items.map((item, i) => ({
+        id: `card_multi_${Date.now()}_${i}`,
+        sessionId: "",
+        content: enforceContentLimit(item.content || text.slice(0, 50), languageCode),
+        category: validateCategory(item.category),
+        sourceSegmentIds: [],
+        linkedCardId: null,
+        linkType: null,
+        topicId: null,
+        visualizationType: "concise_text" as const,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }));
+    } catch (err) {
+      // Fallback: return single card
+      console.log("[SemanticAnalyzer] Multi-parse failed, falling back to single. Raw response:", response.content?.slice(0, 200));
+      console.log("[SemanticAnalyzer] Parse error:", err);
+      return [{
+        id: `card_multi_${Date.now()}`,
+        sessionId: "",
+        content: text.slice(0, 100),
+        category: "fact",
+        sourceSegmentIds: [],
+        linkedCardId: null,
+        linkType: null,
+        topicId: null,
+        visualizationType: "concise_text" as const,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }];
+    }
+  }
+
   async detectDuplicate(
     card: CoreMeaningCard,
     existingCards: CoreMeaningCard[],
@@ -190,7 +243,7 @@ CRITICAL: The "content" field MUST be in the SAME LANGUAGE as the transcript seg
 Respond ONLY with valid JSON in this exact format:
 {
   "content": "<core meaning in ≤30 English words or ≤50 Chinese characters>",
-  "category": "<one of: factual_statement, opinion, question, decision, action_item, disagreement>",
+  "category": "<one of: fact, opinion, question, decision, action_item, proposal>",
   "linkType": "<one of: contradicts, modifies, extends, or null>",
   "linkedCardId": "<id of related card or null>",
   "topicName": "<short topic name>",
@@ -198,6 +251,21 @@ Respond ONLY with valid JSON in this exact format:
   "duplicateCardId": null,
   "mergedContent": null
 }`;
+
+const MULTI_SYSTEM_PROMPT = `You are a semantic analysis engine. Given a text passage, identify the key distinct points, opinions, facts, questions, decisions, or action items. Return them as a JSON array.
+
+CRITICAL: The "content" field MUST be in the SAME LANGUAGE as the input text.
+CRITICAL: Merge related clauses into ONE item. Do NOT split on commas or conjunctions. Each item should represent a complete, self-contained idea — not a sentence fragment.
+
+Respond ONLY with a valid JSON array. Each element has this format:
+{
+  "content": "<core meaning in ≤30 English words or ≤50 Chinese characters>",
+  "category": "<one of: fact, opinion, question, decision, action_item, proposal>"
+}
+
+Example: [{"content":"The meeting is at 3pm","category":"fact"},{"content":"We should cancel the project","category":"opinion"}]
+
+Return as many items as needed based on the text complexity. Short simple text = 1 item. Long text with multiple points = multiple items. Prefer fewer, richer items over many fragments.`;
 
 const DUPLICATE_SYSTEM_PROMPT = `You detect duplicate or rephrased points in a conversation. Given a new card and existing cards, determine if the new card duplicates an existing one.
 
@@ -276,7 +344,7 @@ function parseAnalysisResponse(response: LLMResponse): AnalysisResult {
     const json = extractJson(response.content);
     return {
       content: String(json.content ?? ""),
-      category: String(json.category ?? "factual_statement") as MeaningCategory,
+      category: String(json.category ?? "fact") as MeaningCategory,
       linkType: (json.linkType as AnalysisResult["linkType"]) ?? null,
       linkedCardId: json.linkedCardId != null ? String(json.linkedCardId) : null,
       topicName: String(json.topicName ?? "General"),
@@ -287,7 +355,7 @@ function parseAnalysisResponse(response: LLMResponse): AnalysisResult {
   } catch {
     return {
       content: response.content.slice(0, 100),
-      category: "factual_statement",
+      category: "fact",
       linkType: null,
       linkedCardId: null,
       topicName: "General",
@@ -441,7 +509,7 @@ export function validateCategory(category: string): MeaningCategory {
   if (VALID_CATEGORIES.includes(category as MeaningCategory)) {
     return category as MeaningCategory;
   }
-  return "factual_statement";
+  return "fact";
 }
 
 function resolveTopicId(topicName: string, topicMap: TopicMap): string {

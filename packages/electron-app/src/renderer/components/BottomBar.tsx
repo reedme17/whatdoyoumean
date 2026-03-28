@@ -7,6 +7,10 @@ import React, { useRef, useEffect, useState } from "react";
 import gsap from "gsap";
 import { MapPinPlusIcon } from "./ui/map-pin-plus-icon.js";
 import { Square } from "lucide-react";
+import { SlidersHorizontalIcon } from "./ui/sliders-icon.js";
+import { Popover, PopoverTrigger, PopoverContent } from "./ui/popover.js";
+import type { SttLanguage } from "./ExpandPanel.js";
+import { Tabs, TabsList, TabsTrigger } from "./ui/tabs.js";
 
 // Sequence: 0→1→2→3→pause(3s)→2→1→0→pause(3s), 0.5s per step
 const DOT_SEQUENCE = [0, 1, 2, 3, 3, 3, 3, 3, 3, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0];
@@ -32,9 +36,13 @@ interface Props {
   isCapturing?: boolean;
   pendingPreview?: string;
   pendingTextRef?: React.RefObject<HTMLDivElement>;
+  sttLanguage?: SttLanguage;
+  onSttLanguageChange?: (lang: SttLanguage) => void;
+  responseEnabled?: boolean;
+  onResponseEnabledChange?: (v: boolean) => void;
 }
 
-export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false, pendingPreview = "", pendingTextRef }: Props): React.JSX.Element {
+export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false, pendingPreview = "", pendingTextRef, sttLanguage = "zh+en", onSttLanguageChange, responseEnabled = false, onResponseEnabledChange }: Props): React.JSX.Element {
   const outerRef = useRef<HTMLDivElement>(null);
   const pendingBlockRef = useRef<HTMLDivElement>(null);
   const speakerRef = useRef<HTMLSpanElement>(null);
@@ -177,14 +185,58 @@ export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false
           <MapPinPlusIcon size={20} />
         </button>
 
-        <div className="flex-1 min-w-0 flex items-center justify-end gap-[6px]">
+        <div className="flex-1 min-w-0 flex items-center justify-end gap-[16px]">
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                className="text-[#93918E] hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0"
+                title="Settings"
+                aria-label="Settings"
+              >
+                <SlidersHorizontalIcon size={18} />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="top" align="end" className="w-auto p-3">
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] font-sans font-medium text-[#60594D]">Language</span>
+                  <Tabs value={sttLanguage === "zh" ? "cn" : sttLanguage === "en" ? "en" : "multi"} onValueChange={(v) => onSttLanguageChange?.(v === "cn" ? "zh" : v === "en" ? "en" : "zh+en")}>
+                    <TabsList>
+                      <TabsTrigger value="multi">Multi</TabsTrigger>
+                      <TabsTrigger value="cn">中文</TabsTrigger>
+                      <TabsTrigger value="en">EN</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] font-sans font-medium text-[#60594D]">Source</span>
+                  <Tabs defaultValue="both">
+                    <TabsList>
+                      <TabsTrigger value="both">Both</TabsTrigger>
+                      <TabsTrigger value="mic">Mic</TabsTrigger>
+                      <TabsTrigger value="internal">Internal</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] font-sans font-medium text-[#60594D]">Response</span>
+                  <Tabs value={responseEnabled ? "on" : "off"} onValueChange={(v) => onResponseEnabledChange?.(v === "on")}>
+                    <TabsList>
+                      <TabsTrigger value="on">On</TabsTrigger>
+                      <TabsTrigger value="off">Off</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
           <button
             className="flex items-center gap-[6px] text-sm font-sans font-medium text-[#93918E] hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0 group"
             onClick={onStop}
             title="Stop session (⌘⇧S)"
             aria-label="Stop session"
           >
-            <Square size={10} fill="currentColor" strokeWidth={0} className="group-hover:scale-[1.2]" style={{ transition: "transform 400ms ease-out" }} />
+            <Square size={12} fill="currentColor" strokeWidth={0} className="group-hover:scale-[1.2]" style={{ transition: "transform 400ms ease-out" }} />
             End
           </button>
         </div>

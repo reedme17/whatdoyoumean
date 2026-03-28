@@ -81,7 +81,7 @@ describe("WebSocket handler — text:submit pipeline simulation", () => {
     const viz = new VisualizationEngine();
 
     const textCard = {
-      id: "c1", sessionId: "s1", category: "factual_statement" as const,
+      id: "c1", sessionId: "s1", category: "fact" as const,
       content: "Test", sourceSegmentIds: [], linkedCardIds: [],
       linkType: null, topicId: "t1", visualizationFormat: "concise_text" as const,
       isHighlighted: false, createdAt: new Date(), updatedAt: new Date(),

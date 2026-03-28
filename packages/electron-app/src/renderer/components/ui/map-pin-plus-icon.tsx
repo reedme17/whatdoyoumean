@@ -1,95 +1,87 @@
-/**
- * Animated MapPinPlus Icon — bookmark/flag action.
- * Plus sign pulses on hover.
- */
+"use client";
 
+import type { Variants } from "motion/react";
 import { motion, useAnimation } from "motion/react";
 import type { HTMLAttributes } from "react";
-import { forwardRef, useCallback, useEffect, useRef, useState } from "react";
+import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
+
 import { cn } from "../../lib/utils.js";
 
-export interface MapPinPlusIconHandle {
+export interface MapPinPlusInsideIconHandle {
   startAnimation: () => void;
   stopAnimation: () => void;
 }
 
-interface MapPinPlusIconProps extends HTMLAttributes<HTMLDivElement> {
+interface MapPinPlusInsideIconProps extends HTMLAttributes<HTMLDivElement> {
   size?: number;
 }
 
-const MapPinPlusIcon = forwardRef<MapPinPlusIconHandle, MapPinPlusIconProps>(
-  ({ onMouseEnter, onMouseLeave, className, size = 20, ...props }, ref) => {
-    const [isHovered, setIsHovered] = useState(false);
+const SVG_VARIANTS: Variants = {
+  normal: { y: 0 },
+  animate: {
+    y: [0, -5, -3],
+    transition: { duration: 0.5, times: [0, 0.6, 1] },
+  },
+};
+
+const VERTICAL_BAR_VARIANTS: Variants = {
+  normal: { opacity: 1 },
+  animate: {
+    opacity: [0, 1],
+    pathLength: [0, 1],
+    transition: { delay: 0.3, duration: 0.2, opacity: { duration: 0.1, delay: 0.3 } },
+  },
+};
+
+const HORIZONTAL_BAR_VARIANTS: Variants = {
+  normal: { opacity: 1 },
+  animate: {
+    opacity: [0, 1],
+    pathLength: [0, 1],
+    transition: { delay: 0.6, duration: 0.2, opacity: { duration: 0.1, delay: 0.6 } },
+  },
+};
+
+const MapPinPlusInsideIcon = forwardRef<MapPinPlusInsideIconHandle, MapPinPlusInsideIconProps>(
+  ({ onMouseEnter, onMouseLeave, className, size = 28, ...props }, ref) => {
     const controls = useAnimation();
     const isControlledRef = useRef(false);
 
-    if (ref && typeof ref === "object") {
+    useImperativeHandle(ref, () => {
       isControlledRef.current = true;
-      (ref as React.MutableRefObject<MapPinPlusIconHandle>).current = {
-        startAnimation: () => setIsHovered(true),
-        stopAnimation: () => setIsHovered(false),
+      return {
+        startAnimation: () => controls.start("animate"),
+        stopAnimation: () => controls.start("normal"),
       };
-    }
+    });
 
     const handleMouseEnter = useCallback(
       (e: React.MouseEvent<HTMLDivElement>) => {
-        if (!isControlledRef.current) setIsHovered(true);
-        onMouseEnter?.(e);
-      },
-      [onMouseEnter]
+        if (isControlledRef.current) { onMouseEnter?.(e); }
+        else { controls.start("animate"); }
+      }, [controls, onMouseEnter]
     );
 
     const handleMouseLeave = useCallback(
       (e: React.MouseEvent<HTMLDivElement>) => {
-        if (!isControlledRef.current) setIsHovered(false);
-        onMouseLeave?.(e);
-      },
-      [onMouseLeave]
+        if (isControlledRef.current) { onMouseLeave?.(e); }
+        else { controls.start("normal"); }
+      }, [controls, onMouseLeave]
     );
 
-    useEffect(() => {
-      if (isHovered) {
-        controls.start({
-          scale: [1, 1.3, 1],
-          transition: { duration: 0.4, ease: "easeInOut" },
-        });
-      } else {
-        controls.stop();
-        controls.set({ scale: 1 });
-      }
-    }, [isHovered, controls]);
-
     return (
-      <div
-        className={cn(className)}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        {...props}
-      >
-        <svg
-          fill="none"
-          height={size}
-          stroke="currentColor"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="2"
-          viewBox="0 0 24 24"
-          width={size}
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          {/* Pin body */}
-          <path d="M19.43 12.935c.357-.763.57-1.595.57-2.435a8 8 0 0 0-16 0c0 4.993 5.539 10.193 7.399 11.799a1 1 0 0 0 1.202 0 32 32 0 0 0 2.56-2.327" />
-          {/* Pin dot */}
-          <circle cx="12" cy="10" r="3" />
-          {/* Plus sign — animated */}
-          <motion.path d="M16 18h6" animate={controls} />
-          <motion.path d="M19 15v6" animate={controls} />
-        </svg>
+      <div className={cn(className)} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave} {...props}>
+        <motion.svg animate={controls} fill="none" height={size} initial="normal" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" variants={SVG_VARIANTS} viewBox="0 0 24 24" width={size} xmlns="http://www.w3.org/2000/svg">
+          <path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" />
+          <motion.path animate={controls} d="M12 7v6" initial="normal" variants={HORIZONTAL_BAR_VARIANTS} />
+          <motion.path animate={controls} d="M9 10h6" initial="normal" variants={VERTICAL_BAR_VARIANTS} />
+        </motion.svg>
       </div>
     );
   }
 );
 
-MapPinPlusIcon.displayName = "MapPinPlusIcon";
+MapPinPlusInsideIcon.displayName = "MapPinPlusInsideIcon";
 
-export { MapPinPlusIcon };
+// Keep backward-compatible export name
+export { MapPinPlusInsideIcon, MapPinPlusInsideIcon as MapPinPlusIcon };

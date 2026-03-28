@@ -1,14 +1,12 @@
 /**
- * TextModeScreen — editorial text analysis.
- * Serif heading, large textarea, analyze button.
+ * TextModeScreen — text analysis mode.
+ * Matches design pattern: title top-left, content area, bottom bar with actions.
  */
 
 import React, { useState } from "react";
 import type { CoreMeaningCard, Recommendation } from "@wdym/shared";
 import { RecapScreen } from "./RecapScreen.js";
-import { Button } from "./ui/button.js";
-import { Textarea } from "./ui/textarea.js";
-import { Separator } from "./ui/separator.js";
+import { XIcon } from "./ui/x-icon.js";
 
 interface Props {
   onAnalyze: (text: string) => void;
@@ -41,48 +39,48 @@ export function TextModeScreen({
         }}
         onClose={onClose}
         onEditCard={() => {}}
+        title="Results"
+        actionLabel="Analyze another"
+        showSpeakers={false}
       />
     );
   }
 
   return (
     <div className="flex flex-col h-full bg-background" role="main" aria-label="Text analysis mode">
-      <div className="flex items-center justify-between px-8 py-5">
-        <h1 className="font-serif text-2xl font-normal">Text Mode</h1>
-        <button
-          className="text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none"
-          onClick={onClose}
-          aria-label="Close text mode"
-        >
-          ✕
-        </button>
+      {/* Title */}
+      <div className="pl-[20px] pt-[12px] shrink-0">
+        <h1 className="font-serif font-normal text-[20px] text-[#60594D]">Text mode</h1>
       </div>
-      <Separator />
 
-      <div className="flex-1 flex flex-col px-8 py-8 gap-6">
-        <Textarea
-          className="flex-1 min-h-[200px] text-base leading-relaxed font-serif bg-card"
+      {/* Content area */}
+      <div className="flex-1 flex flex-col px-[40px] py-[20px]">
+        <textarea
+          className="flex-1 w-full text-sm font-sans leading-relaxed text-foreground bg-transparent border-none outline-none resize-none placeholder:text-[#93918E]"
           placeholder="Paste or type text here..."
           value={text}
           onChange={(e) => setText(e.target.value)}
           disabled={analyzing}
           aria-label="Text input for analysis"
         />
+      </div>
 
-        <div className="flex justify-center">
-          <Button
-            variant="outline"
-            className="px-12 py-3 h-auto text-xs tracking-[0.25em] uppercase font-semibold"
-            onClick={() => text.trim() && onAnalyze(text)}
-            disabled={!text.trim() || analyzing}
-          >
-            {analyzing ? "Analyzing..." : "Analyze"}
-          </Button>
-        </div>
-
-        <div className="text-center text-xs text-muted font-sans">
-          Supports Chinese, English, and mixed-language text
-        </div>
+      {/* Bottom bar */}
+      <div className="flex items-center justify-between px-[20px] pt-[12px] pb-[20px] shrink-0">
+        <button
+          className="font-sans font-bold text-sm text-[#5B5449] hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0 disabled:opacity-40 disabled:cursor-not-allowed"
+          onClick={() => text.trim() && onAnalyze(text)}
+          disabled={!text.trim() || analyzing}
+        >
+          {analyzing ? "Analyzing..." : "Analyze"}
+        </button>
+        <button
+          className="text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none"
+          onClick={onClose}
+          aria-label="Close text mode"
+        >
+          <XIcon size={20} />
+        </button>
       </div>
     </div>
   );

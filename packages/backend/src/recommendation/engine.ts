@@ -158,7 +158,9 @@ export class RecommendationEngine {
 
 // ── prompt builders ──────────────────────────────────────────────
 
-const SYSTEM_PROMPT = `You are a conversation recommendation engine. Given a core meaning card and conversation context, generate 1-3 actionable conversation recommendations.
+const SYSTEM_PROMPT = `You are a conversation recommendation engine. Given a core meaning card and conversation context, generate 1-3 SHORT intent-focused response suggestions.
+
+IMPORTANT: Keep each recommendation to 2-5 words maximum. Focus on the INTENT or ACTION, not full sentences. Examples: "Ask for evidence", "Clarify timeline", "Propose alternative", "Challenge assumption", "Summarize so far".
 
 CRITICAL: Your recommendation text MUST be in the SAME LANGUAGE as the card content. If the card is in Chinese, write recommendations in Chinese. If in English, write in English. If mixed, match the dominant language.
 

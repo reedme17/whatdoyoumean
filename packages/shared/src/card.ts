@@ -3,12 +3,12 @@
  */
 
 export type MeaningCategory =
-  | 'factual_statement'
+  | 'fact'
   | 'opinion'
   | 'question'
   | 'decision'
   | 'action_item'
-  | 'disagreement';
+  | 'proposal';
 
 export type VisualizationFormat = 'concise_text' | 'flow_diagram';
 

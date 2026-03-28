@@ -61,6 +61,8 @@ export function App(): React.JSX.Element {
   const sessionStartRef = useRef<number>(0);
   const [audioSource, setAudioSource] = useState<"mic" | "mic+system">("mic");
   const [sttLanguage, setSttLanguage] = useState<SttLanguage>("zh+en");
+  const [responseEnabled, setResponseEnabled] = useState(false);
+
   const [pendingPreview, setPendingPreview] = useState<string>("");
 
   // ── Text mode state ──
@@ -131,6 +133,13 @@ export function App(): React.JSX.Element {
 
   const { send } = useSocket(handleServerEvent);
 
+  // Send settings:update to backend when response toggle changes mid-session
+  useEffect(() => {
+    if (screen === "live") {
+      send({ type: "settings:update", settings: { responseEnabled } });
+    }
+  }, [responseEnabled, screen, send]);
+
   // ── Audio capture (renderer-side mic → base64 WAV → backend via WS) ──
   const { startCapture, stopCapture, isCapturing, error: audioError, analyser } = useAudioCapture({ send, mode: "online", captureSystem: audioSource === "mic+system" });
 
@@ -165,7 +174,7 @@ export function App(): React.JSX.Element {
     goToScreen("live");
 
     // Notify backend to start session
-    send({ type: "session:start", config: { mode: "online", sampleRate: 16000, channels: 1, noiseSuppression: true, autoGain: true, language: sttLanguage } });
+    send({ type: "session:start", config: { mode: "online", sampleRate: 16000, channels: 1, noiseSuppression: true, autoGain: true, language: sttLanguage, responseEnabled } });
 
     // Start real audio capture in renderer (getUserMedia → base64 WAV → WS)
     try {
@@ -246,7 +255,7 @@ export function App(): React.JSX.Element {
     setTextRecs([]);
 
     // Start a text-mode session first, then submit text
-    send({ type: "session:start", config: { mode: "offline", sampleRate: 16000, channels: 1, noiseSuppression: false, autoGain: false, language: sttLanguage } });
+    send({ type: "session:start", config: { mode: "offline", sampleRate: 16000, channels: 1, noiseSuppression: false, autoGain: false, language: sttLanguage, responseEnabled } });
 
     // Small delay to let session initialize, then submit text
     setTimeout(() => {
@@ -262,7 +271,7 @@ export function App(): React.JSX.Element {
           const mockCard: CoreMeaningCard = {
             id: "tc_" + Date.now(),
             sessionId: "",
-            category: "factual_statement",
+            category: "fact",
             content: text.slice(0, 100),
             sourceSegmentIds: [],
             linkedCardIds: [],
@@ -390,6 +399,10 @@ export function App(): React.JSX.Element {
           onFlag={handleFlag}
           onStop={handleStop}
           pendingPreview={pendingPreview}
+          sttLanguage={sttLanguage}
+          onSttLanguageChange={setSttLanguage}
+          responseEnabled={responseEnabled}
+          onResponseEnabledChange={setResponseEnabled}
         />
       )}
 
@@ -441,6 +454,8 @@ export function App(): React.JSX.Element {
         onLogout={handleLogout}
         sttLanguage={sttLanguage}
         onSttLanguageChange={setSttLanguage}
+        responseEnabled={responseEnabled}
+        onResponseEnabledChange={setResponseEnabled}
       />
 
 

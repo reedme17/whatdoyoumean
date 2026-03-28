@@ -22,7 +22,7 @@ export interface RenderOutput {
 const DIAGRAM_CATEGORIES: MeaningCategory[] = [
   "decision",
   "action_item",
-  "disagreement",
+  "proposal",
 ];
 
 // ── VisualizationEngine ──────────────────────────────────────────
@@ -165,12 +165,12 @@ export class VisualizationEngine {
 
 function formatCategory(category: MeaningCategory): string {
   const labels: Record<MeaningCategory, string> = {
-    factual_statement: "Fact",
+    fact: "Fact",
     opinion: "Opinion",
     question: "Question",
     decision: "Decision",
     action_item: "Action",
-    disagreement: "Disagreement",
+    proposal: "Proposal",
   };
   return labels[category] ?? category;
 }

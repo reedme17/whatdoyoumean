@@ -25,7 +25,7 @@ function makeArchive(userId: string, sessionId: string, topicSummary = "Test"): 
       metadata: { platform: "web", deviceInfo: "test", appVersion: "0.1.0", localProcessingOnly: false },
     },
     transcripts: [{ id: "t1", sessionId, text: "Hello", languageCode: "en", speakerId: "s1", startTime: 0, endTime: 1000, isFinal: true, confidence: 0.9, provider: "groq", createdAt: new Date() }],
-    cards: [{ id: "c1", sessionId, category: "factual_statement", content: "Test card", sourceSegmentIds: ["t1"], linkedCardIds: [], linkType: null, topicId: "t1", visualizationFormat: "concise_text", isHighlighted: false, createdAt: new Date(), updatedAt: new Date() }],
+    cards: [{ id: "c1", sessionId, category: "fact", content: "Test card", sourceSegmentIds: ["t1"], linkedCardIds: [], linkType: null, topicId: "t1", visualizationFormat: "concise_text", isHighlighted: false, createdAt: new Date(), updatedAt: new Date() }],
     recommendations: [],
     speakers: [],
     topicMap: { sessionId, topics: [], relations: [] },

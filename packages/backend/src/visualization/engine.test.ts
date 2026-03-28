@@ -41,8 +41,8 @@ describe("VisualizationEngine", () => {
   const engine = new VisualizationEngine();
 
   describe("selectFormat()", () => {
-    it("returns concise_text for factual_statement", () => {
-      expect(engine.selectFormat(makeCard({ category: "factual_statement" }))).toBe("concise_text");
+    it("returns concise_text for fact", () => {
+      expect(engine.selectFormat(makeCard({ category: "fact" }))).toBe("concise_text");
     });
 
     it("returns concise_text for opinion", () => {
@@ -61,8 +61,8 @@ describe("VisualizationEngine", () => {
       expect(engine.selectFormat(makeCard({ category: "action_item" }))).toBe("flow_diagram");
     });
 
-    it("returns flow_diagram for disagreement", () => {
-      expect(engine.selectFormat(makeCard({ category: "disagreement" }))).toBe("flow_diagram");
+    it("returns flow_diagram for proposal", () => {
+      expect(engine.selectFormat(makeCard({ category: "proposal" }))).toBe("flow_diagram");
     });
 
     it("returns flow_diagram for cards with linked cards", () => {
@@ -111,7 +111,7 @@ describe("VisualizationEngine", () => {
   describe("renderCard() — flow_diagram", () => {
     it("renders flow diagram with linked cards", () => {
       const card = makeCard({
-        category: "disagreement",
+        category: "proposal",
         linkedCardIds: ["card-2"],
         linkType: "contradicts",
       });
@@ -119,7 +119,7 @@ describe("VisualizationEngine", () => {
 
       expect(output.type).toBe("flow_diagram");
       expect(output.html).toContain("flow-diagram");
-      expect(output.html).toContain("Disagreement");
+      expect(output.html).toContain("Proposal");
       expect(output.html).toContain('data-target="card-2"');
       expect(output.html).toContain('data-link-type="contradicts"');
     });

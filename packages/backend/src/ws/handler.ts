@@ -26,6 +26,7 @@ import { VisualizationEngine } from "../visualization/engine.js";
 import { LanguageDetector } from "../language/detector.js";
 import { TranscriptionEngine } from "../stt/engine.js";
 import { GroqWhisperProvider } from "../stt/providers/groq-whisper.js";
+import { DeepgramProvider } from "../stt/providers/deepgram.js";
 import type { LLMGateway } from "../llm/gateway.js";
 
 export interface WsHandlerDeps {
@@ -49,6 +50,7 @@ interface SocketSessionState {
   /** Timestamp of last received audio chunk */
   lastAudioTime: number;
   /** STT language preference: "auto" | "zh" | "en" */
+  responseEnabled: boolean;
   sttLanguage: string;
 }
 
@@ -95,6 +97,7 @@ export function setupWebSocketHandlers(
       silenceTimer: null,
       lastAudioTime: 0,
       sttLanguage: "auto",
+      responseEnabled: false,
     };
 
     // Wire transcription engine callbacks
@@ -138,6 +141,10 @@ export function setupWebSocketHandlers(
         const lang = (data.config as unknown as Record<string, unknown>)?.language;
         state.sttLanguage = (lang === "zh+en" || lang === "zh" || lang === "en" || lang === "auto") ? (lang as string) : "zh+en";
         console.log("[WS] STT language preference:", state.sttLanguage);
+
+        const respEnabled = (data.config as unknown as Record<string, unknown>)?.responseEnabled;
+        state.responseEnabled = respEnabled === true;
+        console.log("[WS] Response enabled:", state.responseEnabled);
 
         state.transcriptionEngine.startTranscription(session.id, "en");
 
@@ -215,6 +222,14 @@ export function setupWebSocketHandlers(
       }
     });
 
+    // Handle mid-session settings updates
+    socket.on("settings:update", (data: { type: string; settings?: Record<string, unknown> }) => {
+      if (data.settings?.responseEnabled !== undefined) {
+        state.responseEnabled = data.settings.responseEnabled === true;
+        console.log("[WS] Settings updated — responseEnabled:", state.responseEnabled);
+      }
+    });
+
     socket.on("text:submit", (data: Extract<ClientEvent, { type: "text:submit" }>) => {
       try {
         console.log("[WS] text:submit received, sessionId:", state.sessionId, "text length:", data?.text?.length);
@@ -271,6 +286,7 @@ export function setupWebSocketHandlers(
 
 /** Shared Groq Whisper provider instance for audio chunk transcription */
 const groqWhisper = new GroqWhisperProvider();
+const deepgram = new DeepgramProvider();
 
 /** Silence duration (ms) before finalizing accumulated text into a card */
 const SILENCE_THRESHOLD_MS = 3000;
@@ -305,9 +321,23 @@ async function processAudioChunk(
   try {
     console.log(`[WS] processAudioChunk: ${Math.round(audioBase64.length / 1024)}KB base64`);
 
-    const whisperLang = (state.sttLanguage === "zh" || state.sttLanguage === "en") ? state.sttLanguage : undefined;
-    console.log("[WS] whisperLang:", whisperLang, "state.sttLanguage:", state.sttLanguage);
-    const { text, latencyMs } = await groqWhisper.transcribeBase64Wav(audioBase64, whisperLang);
+    const sttLang = (state.sttLanguage === "zh" || state.sttLanguage === "en") ? state.sttLanguage : undefined;
+    let text: string;
+    let latencyMs: number;
+    let speakerIdx = 0;
+
+    // Try Deepgram first (has diarization), fall back to Groq Whisper
+    if (process.env.DEEPGRAM_API_KEY) {
+      const dg = await deepgram.transcribeBase64Wav(audioBase64, sttLang);
+      text = dg.text;
+      latencyMs = dg.latencyMs;
+      speakerIdx = dg.speaker;
+    } else {
+      console.log("[WS] No DEEPGRAM_API_KEY, falling back to Groq Whisper");
+      const gw = await groqWhisper.transcribeBase64Wav(audioBase64, sttLang);
+      text = gw.text;
+      latencyMs = gw.latencyMs;
+    }
 
     if (!text || text.trim().length === 0) {
       console.log("[WS] Empty transcription — silence detected");
@@ -325,7 +355,7 @@ async function processAudioChunk(
       sessionId: state.sessionId!,
       text,
       languageCode: langResult.primaryLanguage,
-      speakerId: "user",
+      speakerId: `speaker_${speakerIdx}`,
       startTime: Date.now() - latencyMs,
       endTime: Date.now(),
       isFinal: true,
@@ -447,14 +477,18 @@ async function processFinalTranscript(
     state.topicMap = await analyzer.updateTopicMap(card, state.topicMap);
     emitServerEvent(socket, { type: "topic:updated", topicMap: state.topicMap });
 
-    // Recommendations
-    const recommendations = await recommender.generateRecommendations(card, {
-      sessionId: state.sessionId!,
-      existingCards: state.cards,
-      topicMap: state.topicMap,
-    });
-    if (recommendations.length > 0) {
-      emitServerEvent(socket, { type: "recommendation:new", recommendations });
+    // Recommendations (skip if disabled to save tokens)
+    if (state.responseEnabled) {
+      const recommendations = await recommender.generateRecommendations(card, {
+        sessionId: state.sessionId!,
+        existingCards: state.cards,
+        topicMap: state.topicMap,
+      });
+      if (recommendations.length > 0) {
+        emitServerEvent(socket, { type: "recommendation:new", recommendations });
+      }
+    } else {
+      console.log("[WS] Recommendations disabled — skipping LLM call");
     }
   } catch (err) {
     console.error("[WS] Pipeline error:", err);
@@ -494,12 +528,19 @@ async function processTextSubmit(
     state.transcripts.push(segment);
     emitServerEvent(socket, { type: "transcript:final", segment });
 
-    // Run through semantic pipeline (same as audio path)
-    await processFinalTranscript(
-      socket, state, segment,
-      analyzer, recommender, visualizer,
-    );
+    // Use multi-card analysis for text mode (LLM decides how many cards)
+    console.log("[WS] Running multi-card analysis for text mode");
+    const cards = await analyzer.analyzeMulti(text, langResult.primaryLanguage);
+    console.log(`[WS] Multi-analysis returned ${cards.length} cards`);
+
+    for (const card of cards) {
+      card.sessionId = state.sessionId!;
+      card.sourceSegmentIds = [segment.id];
+      state.cards.push(card);
+      emitServerEvent(socket, { type: "card:created", card });
+    }
   } catch (err) {
+    console.error("[WS] Text pipeline error:", err);
     emitError(socket, "text_pipeline", String(err), true);
   }
 }

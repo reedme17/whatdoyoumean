@@ -133,21 +133,21 @@ describe("enforceContentLimit", () => {
 describe("validateCategory", () => {
   it("returns valid categories unchanged", () => {
     const categories: MeaningCategory[] = [
-      "factual_statement",
+      "fact",
       "opinion",
       "question",
       "decision",
       "action_item",
-      "disagreement",
+      "proposal",
     ];
     for (const cat of categories) {
       expect(validateCategory(cat)).toBe(cat);
     }
   });
 
-  it("defaults to factual_statement for invalid categories", () => {
-    expect(validateCategory("invalid")).toBe("factual_statement");
-    expect(validateCategory("")).toBe("factual_statement");
+  it("defaults to fact for invalid categories", () => {
+    expect(validateCategory("invalid")).toBe("fact");
+    expect(validateCategory("")).toBe("fact");
   });
 });
 
@@ -190,7 +190,7 @@ describe("SemanticAnalyzer", () => {
       const gateway = makeMockGateway({
         semantic_analysis: JSON.stringify({
           content: longContent,
-          category: "factual_statement",
+          category: "fact",
           linkType: null,
           linkedCardId: null,
           topicName: "General",
@@ -231,7 +231,7 @@ describe("SemanticAnalyzer", () => {
       expect(chineseCount).toBeLessThanOrEqual(50);
     });
 
-    it("defaults to factual_statement for invalid categories", async () => {
+    it("defaults to fact for invalid categories", async () => {
       const gateway = makeMockGateway({
         semantic_analysis: JSON.stringify({
           content: "Some content",
@@ -248,14 +248,14 @@ describe("SemanticAnalyzer", () => {
       const analyzer = new SemanticAnalyzer(gateway);
       const card = await analyzer.analyze(makeSegment(), makeContext());
 
-      expect(card.category).toBe("factual_statement");
+      expect(card.category).toBe("fact");
     });
 
     it("populates linkedCardIds when LLM detects a relationship", async () => {
       const gateway = makeMockGateway({
         semantic_analysis: JSON.stringify({
           content: "Actually, launch should be Monday instead",
-          category: "disagreement",
+          category: "opinion",
           linkType: "contradicts",
           linkedCardId: "card-1",
           topicName: "Product Launch",
@@ -284,7 +284,7 @@ describe("SemanticAnalyzer", () => {
       const card = await analyzer.analyze(makeSegment(), makeContext());
 
       // Should fall back to defaults
-      expect(card.category).toBe("factual_statement");
+      expect(card.category).toBe("fact");
       expect(card.content).toBeTruthy();
     });
 

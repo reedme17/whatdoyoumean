@@ -9,12 +9,12 @@ import { Input } from "./ui/input.js";
 import { Button } from "./ui/button.js";
 
 const categoryLabels: Record<MeaningCategory, string> = {
-  factual_statement: "Fact",
+  fact: "Fact",
   opinion: "Opinion",
   question: "Question",
   decision: "Decision",
-  action_item: "Action",
-  disagreement: "Disagree",
+  action_item: "To do",
+  proposal: "Proposal",
 };
 
 interface Props {
@@ -44,7 +44,7 @@ export function CoreMeaningCardView({
       style={{ animation: "fadeInUp 0.3s ease-out" }}
     >
       {/* Category — italic 11px */}
-      <span className="font-sans italic text-[11px] whitespace-nowrap shrink-0">
+      <span className="font-sans italic text-[11px] whitespace-nowrap shrink-0 inline-block w-[48px]">
         {categoryLabels[card.category]}
       </span>
 

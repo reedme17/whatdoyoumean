@@ -1,10 +1,11 @@
 /**
- * RecommendationTokens — editorial recommendation pills.
- * Uppercase, letter-spaced, warm gray border.
+ * RecommendationTokens — response suggestions as pills.
+ * Corner-down-right icon + pill-shaped tokens in a row.
  */
 
 import React, { useState } from "react";
 import type { Recommendation } from "@wdym/shared";
+import { CornerDownRightIcon } from "./ui/corner-down-right-icon.js";
 
 interface Props {
   recommendations: Recommendation[];
@@ -29,19 +30,22 @@ export function RecommendationTokens({ recommendations }: Props): React.JSX.Elem
     <div
       role="region"
       aria-label="Recommendations"
-      className="flex flex-wrap gap-2 px-8 py-3 border-t border-border bg-background"
+      className="flex items-center gap-2 px-[20px] py-2 bg-background"
     >
-      {recommendations.map((rec) => (
-        <button
-          key={rec.id}
-          className="text-[11px] tracking-[0.05em] px-3 py-1 border border-border bg-transparent hover:bg-secondary text-muted hover:text-foreground transition-colors cursor-pointer font-sans"
-          onClick={() => handleCopy(rec)}
-          title={rec.reasoning}
-          aria-label={`Copy recommendation: ${rec.text}`}
-        >
-          {copiedId === rec.id ? "Copied" : rec.text}
-        </button>
-      ))}
+      <CornerDownRightIcon size={14} className="text-[#93918E] shrink-0" />
+      <div className="flex flex-wrap gap-1.5">
+        {recommendations.map((rec) => (
+          <button
+            key={rec.id}
+            className="text-[10px] px-2.5 py-0.5 rounded-full border border-border bg-transparent hover:bg-[#F0EDE8] text-[#60594D] hover:text-[#5B5449] transition-colors cursor-pointer font-sans font-medium"
+            onClick={() => handleCopy(rec)}
+            title={rec.reasoning}
+            aria-label={`Copy recommendation: ${rec.text}`}
+          >
+            {copiedId === rec.id ? "Copied" : rec.text}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
