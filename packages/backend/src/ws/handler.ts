@@ -27,6 +27,7 @@ import { LanguageDetector } from "../language/detector.js";
 import { TranscriptionEngine } from "../stt/engine.js";
 import { GroqWhisperProvider } from "../stt/providers/groq-whisper.js";
 import { DeepgramProvider } from "../stt/providers/deepgram.js";
+import { DeepgramStreamingProvider } from "../stt/providers/deepgram-streaming.js";
 import type { LLMGateway } from "../llm/gateway.js";
 
 export interface WsHandlerDeps {
@@ -52,6 +53,14 @@ interface SocketSessionState {
   /** STT language preference: "auto" | "zh" | "en" */
   responseEnabled: boolean;
   sttLanguage: string;
+  /** Deepgram streaming provider instance (one per session) */
+  deepgramStream: DeepgramStreamingProvider | null;
+  /** Whether we're using streaming mode (vs REST chunk mode) */
+  useStreaming: boolean;
+  /** Interim text from Deepgram streaming (not yet final) */
+  interimText: string;
+  /** Set of transcript texts that were marked/highlighted by user */
+  markedTexts: Set<string>;
   /** Consolidation: version counter to discard stale results */
   consolidationVersion: number;
   /** Consolidation: locked cards from previous windows (won't be re-analyzed) */
@@ -108,6 +117,10 @@ export function setupWebSocketHandlers(
       lastAudioTime: 0,
       sttLanguage: "auto",
       responseEnabled: false,
+      deepgramStream: null,
+      useStreaming: !!process.env.DEEPGRAM_API_KEY,
+      interimText: "",
+      markedTexts: new Set(),
       consolidationVersion: 0,
       lockedCards: [],
       windowStartIndex: 0,
@@ -163,6 +176,24 @@ export function setupWebSocketHandlers(
 
         state.transcriptionEngine.startTranscription(session.id, "en");
 
+        // Start Deepgram streaming if available
+        if (state.useStreaming && process.env.DEEPGRAM_API_KEY) {
+          const sttLang = (state.sttLanguage === "zh" || state.sttLanguage === "en") ? state.sttLanguage : undefined;
+          state.deepgramStream = new DeepgramStreamingProvider();
+          state.deepgramStream.start(
+            sttLang,
+            // onResult: interim or final transcription
+            (result) => {
+              handleStreamingResult(socket, state, result, semanticAnalyzer, recommendationEngine, visualizationEngine);
+            },
+            // onUtteranceEnd: Deepgram detected end of utterance
+            () => {
+              handleUtteranceEnd(socket, state, semanticAnalyzer, recommendationEngine, visualizationEngine);
+            },
+          );
+          console.log("[WS] Deepgram streaming started");
+        }
+
         emitServerEvent(socket, { type: "session:state", state: "active" });
       } catch (err) {
         emitError(socket, "session", String(err), true);
@@ -197,6 +228,13 @@ export function setupWebSocketHandlers(
           clearTimeout(state.silenceTimer);
           state.silenceTimer = null;
         }
+        // Stop Deepgram streaming — wait for final results to arrive
+        if (state.deepgramStream) {
+          state.deepgramStream.stop();
+          state.deepgramStream = null;
+          // Give Deepgram 600ms to send final results before we flush
+          await new Promise((r) => setTimeout(r, 600));
+        }
         // Flush any pending text into a card before ending
         if (state.pendingText.trim()) {
           await finalizePendingText(
@@ -204,6 +242,64 @@ export function setupWebSocketHandlers(
             semanticAnalyzer, recommendationEngine, visualizationEngine,
           );
         }
+
+        // Final consolidation: full transcript review with marks
+        if (state.transcripts.length >= 2) {
+          console.log("[WS] Final consolidation — reviewing all transcripts");
+          const fullText = state.transcripts
+            .map((t) => {
+              const isMarked = state.markedTexts.has(t.text);
+              return `[${t.speakerId}]${isMarked ? " ⭐IMPORTANT" : ""} ${t.text}`;
+            })
+            .join("\n");
+
+          const langResult = state.languageDetector.detectFromText(fullText);
+          const finalCards = await semanticAnalyzer.analyzeMulti(fullText, langResult.primaryLanguage);
+
+          // Dedup
+          const seenContents: string[] = [];
+          const dedupedFinal = finalCards.filter((card) => {
+            const cardLower = card.content.toLowerCase();
+            const cardWords = cardLower.split(/\s+/).filter(w => w.length > 2);
+            for (const seen of seenContents) {
+              const seenWords = seen.split(/\s+/).filter(w => w.length > 2);
+              if (seenWords.length === 0) continue;
+              const overlap = cardWords.filter(w => seenWords.includes(w)).length;
+              const ratio = overlap / Math.min(cardWords.length, seenWords.length);
+              if (ratio > 0.6) return false;
+            }
+            seenContents.push(cardLower);
+            return true;
+          });
+
+          // Inherit highlights
+          const hadHighlight = state.cards.some(c => c.isHighlighted);
+          for (const card of dedupedFinal) {
+            card.sessionId = state.sessionId!;
+          }
+          if (hadHighlight && dedupedFinal.length > 0) {
+            const highlightedContents = state.cards.filter(c => c.isHighlighted).map(c => c.content.toLowerCase());
+            let bestIdx = 0;
+            let bestScore = -1;
+            for (let i = 0; i < dedupedFinal.length; i++) {
+              const cardWords = dedupedFinal[i].content.toLowerCase().split(/\s+/);
+              let score = 0;
+              for (const hc of highlightedContents) {
+                score += cardWords.filter(w => w.length > 2 && hc.includes(w)).length;
+              }
+              for (const mt of state.markedTexts) {
+                score += cardWords.filter(w => w.length > 2 && mt.toLowerCase().includes(w)).length;
+              }
+              if (score > bestScore) { bestScore = score; bestIdx = i; }
+            }
+            dedupedFinal[bestIdx].isHighlighted = true;
+          }
+
+          state.cards = dedupedFinal;
+          console.log(`[WS] Final consolidation complete — ${dedupedFinal.length} cards`);
+          emitServerEvent(socket, { type: "cards:consolidated", cards: dedupedFinal });
+        }
+
         sessionManager.end(state.sessionId);
         state.transcriptionEngine.stopTranscription();
         emitServerEvent(socket, { type: "session:state", state: "ended" });
@@ -219,7 +315,16 @@ export function setupWebSocketHandlers(
         const session = sessionManager.get(state.sessionId);
         if (session?.status !== "active") return;
 
-        // New path: base64-encoded WAV from renderer audio capture
+        // Streaming mode: forward raw PCM to Deepgram stream
+        if (state.useStreaming && state.deepgramStream?.isConnected && data.audioBase64) {
+          const buf = Buffer.from(data.audioBase64, "base64");
+          // Strip WAV header (44 bytes) if present, send raw PCM
+          const pcm = (buf.length > 44 && buf.toString("ascii", 0, 4) === "RIFF") ? buf.subarray(44) : buf;
+          state.deepgramStream.sendAudio(pcm);
+          return;
+        }
+
+        // Fallback: REST chunk mode (base64 WAV)
         if (data.audioBase64 && typeof data.audioBase64 === "string") {
           processAudioChunk(
             socket, state, data.audioBase64,
@@ -245,9 +350,21 @@ export function setupWebSocketHandlers(
       }
       if (data.settings?.sttLanguage !== undefined) {
         const lang = data.settings.sttLanguage as string;
-        if (lang === "zh+en" || lang === "zh" || lang === "en" || lang === "auto") {
+        if ((lang === "zh+en" || lang === "zh" || lang === "en" || lang === "auto") && lang !== state.sttLanguage) {
           state.sttLanguage = lang;
           console.log("[WS] Settings updated — sttLanguage:", state.sttLanguage);
+          // Restart Deepgram stream with new language
+          if (state.deepgramStream) {
+            state.deepgramStream.stop();
+            const sttLang = (lang === "zh" || lang === "en") ? lang : undefined;
+            state.deepgramStream = new DeepgramStreamingProvider();
+            state.deepgramStream.start(
+              sttLang,
+              (result) => handleStreamingResult(socket, state, result, semanticAnalyzer, recommendationEngine, visualizationEngine),
+              () => handleUtteranceEnd(socket, state, semanticAnalyzer, recommendationEngine, visualizationEngine),
+            );
+            console.log("[WS] Deepgram stream restarted with language:", lang);
+          }
         }
       }
     });
@@ -267,11 +384,43 @@ export function setupWebSocketHandlers(
 
     socket.on("speaker:rename", (data: Extract<ClientEvent, { type: "speaker:rename" }>) => {
       // Speaker rename is handled client-side for now
-      // Could propagate to diarizer in future
       socket.emit("speaker:renamed", {
         speakerId: data.speakerId,
         name: data.name,
       });
+    });
+
+    // On-demand recommendation generation (e.g. user toggles response on after analysis)
+    socket.on("recommendations:request", async () => {
+      try {
+        if (!state.sessionId || state.transcripts.length === 0) return;
+        // Build a synthetic card from all raw transcript text
+        const fullText = state.transcripts.map((t) => t.text).join(" ");
+        const syntheticCard = {
+          id: `rec_req_${Date.now()}`,
+          sessionId: state.sessionId,
+          category: "fact" as const,
+          content: fullText.slice(0, 200),
+          sourceSegmentIds: [] as string[],
+          linkedCardIds: [] as string[],
+          linkType: null,
+          topicId: "",
+          visualizationFormat: "concise_text" as const,
+          isHighlighted: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        const recs = await recommendationEngine.generateRecommendations(syntheticCard, {
+          sessionId: state.sessionId,
+          existingCards: state.cards,
+          topicMap: state.topicMap,
+        });
+        if (recs.length > 0) {
+          emitServerEvent(socket, { type: "recommendation:new", recommendations: recs });
+        }
+      } catch (err) {
+        console.error("[WS] recommendations:request error:", err);
+      }
     });
 
     socket.on("bookmark:create", (data: Extract<ClientEvent, { type: "bookmark:create" }>) => {
@@ -283,6 +432,21 @@ export function setupWebSocketHandlers(
           timestamp: data.timestamp,
           note: data.note,
         });
+        // Track the most recent transcript text as marked
+        if (state.transcripts.length > 0) {
+          const lastTranscript = state.transcripts[state.transcripts.length - 1];
+          state.markedTexts.add(lastTranscript.text);
+          console.log("[WS] Marked transcript text:", lastTranscript.text.slice(0, 50));
+        }
+        // Also mark pending text if any
+        if (state.pendingText.trim()) {
+          state.markedTexts.add(state.pendingText.trim());
+        }
+        // Highlight the most recent card on backend too
+        if (state.cards.length > 0) {
+          state.cards[state.cards.length - 1].isHighlighted = true;
+          console.log("[WS] Highlighted card:", state.cards[state.cards.length - 1].content.slice(0, 50));
+        }
       } catch (err) {
         emitError(socket, "bookmark", String(err), true);
       }
@@ -292,6 +456,10 @@ export function setupWebSocketHandlers(
       if (state.silenceTimer) {
         clearTimeout(state.silenceTimer);
         state.silenceTimer = null;
+      }
+      if (state.deepgramStream) {
+        state.deepgramStream.stop();
+        state.deepgramStream = null;
       }
       if (state.sessionId) {
         try {
@@ -567,10 +735,16 @@ async function runConsolidation(
   state.consolidationInFlight = true;
   const version = ++state.consolidationVersion;
 
-  // Build text from window transcripts only
+  // Build text from window transcripts only, marking highlighted ones with ⭐
   const windowText = windowTranscripts
-    .map((t) => `[${t.speakerId}] ${t.text}`)
+    .map((t) => {
+      const isMarked = state.markedTexts.has(t.text);
+      return `[${t.speakerId}]${isMarked ? " ⭐IMPORTANT" : ""} ${t.text}`;
+    })
     .join("\n");
+
+  // Check if any window transcripts are marked
+  const hasMarkedContent = windowTranscripts.some((t) => state.markedTexts.has(t.text));
 
   const langResult = state.languageDetector.detectFromText(windowText);
 
@@ -585,21 +759,50 @@ async function runConsolidation(
       return;
     }
 
-    // Deduplicate by normalized content
-    const seen = new Set<string>();
-    // Add locked card contents to seen set so window cards don't duplicate them
+    // Deduplicate by word overlap (fuzzy — catches paraphrased duplicates)
+    const seenContents: string[] = [];
     for (const lc of state.lockedCards) {
-      seen.add(lc.content.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]/g, ""));
+      seenContents.push(lc.content.toLowerCase());
     }
     const dedupedCards = windowCards.filter((card) => {
-      const key = card.content.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]/g, "");
-      if (seen.has(key)) return false;
-      seen.add(key);
+      const cardLower = card.content.toLowerCase();
+      const cardWords = cardLower.split(/\s+/).filter(w => w.length > 2);
+      // Check against all seen contents for semantic overlap
+      for (const seen of seenContents) {
+        const seenWords = seen.split(/\s+/).filter(w => w.length > 2);
+        if (seenWords.length === 0) continue;
+        const overlap = cardWords.filter(w => seenWords.includes(w)).length;
+        const ratio = overlap / Math.min(cardWords.length, seenWords.length);
+        if (ratio > 0.6) return false; // >60% word overlap = duplicate
+      }
+      seenContents.push(cardLower);
       return true;
     });
 
     for (const card of dedupedCards) {
       card.sessionId = state.sessionId!;
+    }
+
+    // Inherit highlight: if any old card was highlighted, mark the best-matching new card
+    const hadHighlight = state.cards.some(c => c.isHighlighted);
+    if (hadHighlight && dedupedCards.length > 0) {
+      // Collect all highlighted card contents for matching
+      const highlightedContents = state.cards.filter(c => c.isHighlighted).map(c => c.content.toLowerCase());
+      let bestIdx = 0;
+      let bestScore = -1;
+      for (let i = 0; i < dedupedCards.length; i++) {
+        const cardWords = dedupedCards[i].content.toLowerCase().split(/\s+/);
+        let score = 0;
+        for (const hc of highlightedContents) {
+          score += cardWords.filter(w => w.length > 2 && hc.includes(w)).length;
+        }
+        // Also check against marked transcript texts
+        for (const mt of state.markedTexts) {
+          score += cardWords.filter(w => w.length > 2 && mt.toLowerCase().includes(w)).length;
+        }
+        if (score > bestScore) { bestScore = score; bestIdx = i; }
+      }
+      dedupedCards[bestIdx].isHighlighted = true;
     }
 
     const allCards = [...state.lockedCards, ...dedupedCards];
@@ -612,6 +815,83 @@ async function runConsolidation(
     console.error(`[WS] Consolidation v${version} failed:`, err);
   } finally {
     state.consolidationInFlight = false;
+  }
+}
+
+// ── Deepgram Streaming handlers ──
+
+import type { DeepgramStreamResult } from "../stt/providers/deepgram-streaming.js";
+
+function handleStreamingResult(
+  socket: Socket,
+  state: SocketSessionState,
+  result: DeepgramStreamResult,
+  analyzer: SemanticAnalyzer,
+  recommender: RecommendationEngine,
+  visualizer: VisualizationEngine,
+): void {
+  if (result.isFinal) {
+    // Final result — accumulate into pendingText
+    state.pendingText += (state.pendingText ? " " : "") + result.text.trim();
+    state.interimText = "";
+
+    const langResult = state.languageDetector.detectFromText(result.text);
+    const segment: TranscriptSegment = {
+      id: `dg_stream_${Date.now()}`,
+      sessionId: state.sessionId!,
+      text: result.text,
+      languageCode: langResult.primaryLanguage,
+      speakerId: `speaker_${result.speaker}`,
+      startTime: Date.now(),
+      endTime: Date.now(),
+      isFinal: true,
+      confidence: result.confidence,
+      provider: "deepgram_stream",
+      createdAt: new Date(),
+    };
+    state.transcripts.push(segment);
+    state.pendingSegments.push(segment);
+    emitServerEvent(socket, { type: "transcript:final", segment });
+
+    // Show accumulated text as preview
+    emitServerEvent(socket, { type: "pending:preview", text: state.pendingText });
+
+    // Check segmentation triggers
+    const shouldFinalize = checkSegmentationTriggers(state.pendingText);
+    if (shouldFinalize) {
+      if (state.silenceTimer) { clearTimeout(state.silenceTimer); state.silenceTimer = null; }
+      console.log(`[WS] Stream segmentation trigger: ${shouldFinalize}`);
+      finalizePendingText(socket, state, analyzer, recommender, visualizer);
+      return;
+    }
+
+    // Reset silence timer (Deepgram's utterance_end will also trigger finalize)
+    if (state.silenceTimer) clearTimeout(state.silenceTimer);
+    state.silenceTimer = setTimeout(() => {
+      finalizePendingText(socket, state, analyzer, recommender, visualizer);
+    }, SILENCE_THRESHOLD_MS);
+
+    console.log(`[WS] Stream final: "${result.text.slice(0, 60)}" (pending: ${state.pendingText.length} chars)`);
+  } else {
+    // Interim result — show as preview but don't accumulate
+    state.interimText = result.text;
+    const preview = state.pendingText + (state.pendingText ? " " : "") + result.text;
+    emitServerEvent(socket, { type: "pending:preview", text: preview });
+  }
+}
+
+function handleUtteranceEnd(
+  socket: Socket,
+  state: SocketSessionState,
+  analyzer: SemanticAnalyzer,
+  recommender: RecommendationEngine,
+  visualizer: VisualizationEngine,
+): void {
+  // Deepgram detected end of utterance — finalize pending text
+  if (state.pendingText.trim()) {
+    if (state.silenceTimer) { clearTimeout(state.silenceTimer); state.silenceTimer = null; }
+    console.log(`[WS] Utterance end — finalizing ${state.pendingText.length} chars`);
+    finalizePendingText(socket, state, analyzer, recommender, visualizer);
   }
 }
 
@@ -657,6 +937,33 @@ async function processTextSubmit(
       card.sourceSegmentIds = [segment.id];
       state.cards.push(card);
       emitServerEvent(socket, { type: "card:created", card });
+    }
+
+    // Generate recommendations from all raw input if enabled
+    if (state.responseEnabled && cards.length > 0) {
+      const fullText = state.transcripts.map((t) => t.text).join(" ");
+      const syntheticCard = {
+        id: `rec_text_${Date.now()}`,
+        sessionId: state.sessionId!,
+        category: "fact" as const,
+        content: fullText.slice(0, 200),
+        sourceSegmentIds: [] as string[],
+        linkedCardIds: [] as string[],
+        linkType: null,
+        topicId: "",
+        visualizationFormat: "concise_text" as const,
+        isHighlighted: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const recs = await recommender.generateRecommendations(syntheticCard, {
+        sessionId: state.sessionId!,
+        existingCards: state.cards,
+        topicMap: state.topicMap,
+      });
+      if (recs.length > 0) {
+        emitServerEvent(socket, { type: "recommendation:new", recommendations: recs });
+      }
     }
   } catch (err) {
     console.error("[WS] Text pipeline error:", err);

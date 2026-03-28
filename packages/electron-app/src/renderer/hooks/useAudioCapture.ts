@@ -10,8 +10,8 @@ import { useRef, useState, useCallback } from "react";
 
 /** Desired output sample rate for Groq Whisper */
 const TARGET_SAMPLE_RATE = 16000;
-/** Chunk duration in seconds */
-const CHUNK_DURATION_SEC = 2;
+/** Chunk duration in seconds — short for low-latency streaming */
+const CHUNK_DURATION_SEC = 0.25;
 
 interface UseAudioCaptureOptions {
   /** WebSocket send function from useSocket */
@@ -103,7 +103,7 @@ function downsample(buffer: Float32Array, fromRate: number, toRate: number): Flo
 }
 
 /** RMS energy threshold — below this, the chunk is considered silence */
-const SILENCE_RMS_THRESHOLD = 0.005;
+const SILENCE_RMS_THRESHOLD = 0.003;
 
 /**
  * Calculate RMS (root mean square) energy of audio samples.
@@ -152,29 +152,18 @@ export function useAudioCapture({ send, mode = "offline", captureSystem = false 
     const sourceSampleRate = ctx?.sampleRate ?? 44100;
     const downsampled = downsample(merged, sourceSampleRate, TARGET_SAMPLE_RATE);
 
-    // Skip silent chunks to avoid Whisper hallucinations ("Thank you", "You", etc.)
-    const rms = calculateRMS(downsampled);
-    if (rms < SILENCE_RMS_THRESHOLD) {
-      console.log(`[AudioCapture] Silent chunk (RMS=${rms.toFixed(5)}) — skipping`);
-      return;
-    }
-
-    // Encode as WAV base64
-    const audioBase64 = encodeWavBase64(downsampled, TARGET_SAMPLE_RATE);
+    const wavBase64 = encodeWavBase64(downsampled, TARGET_SAMPLE_RATE);
 
     // Send to backend
     send({
       type: "audio:chunk",
-      audioBase64,
+      audioBase64: wavBase64,
       format: "wav",
       sampleRate: TARGET_SAMPLE_RATE,
     });
 
-    console.log(
-      `[AudioCapture] Sent chunk: ${downsampled.length} samples, ` +
-      `${(downsampled.length / TARGET_SAMPLE_RATE).toFixed(1)}s, ` +
-      `${Math.round(audioBase64.length / 1024)}KB base64`
-    );
+    // Log only occasionally to avoid flooding console at 4 chunks/sec
+    // (disabled — too noisy even at 10%)
   }, [send]);
 
   const startCapture = useCallback(async () => {

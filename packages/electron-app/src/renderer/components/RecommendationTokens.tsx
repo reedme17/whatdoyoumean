@@ -18,7 +18,7 @@ export function RecommendationTokens({ recommendations }: Props): React.JSX.Elem
     <div
       role="region"
       aria-label="Recommendations"
-      className="flex items-center gap-2 py-2 bg-background"
+      className="flex items-center gap-2 py-0 bg-background"
     >
       <CornerDownRightIcon size={14} className="text-[#93918E] shrink-0" />
       <div className="flex flex-wrap gap-1.5">

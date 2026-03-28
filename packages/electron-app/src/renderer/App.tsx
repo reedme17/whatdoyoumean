@@ -44,10 +44,12 @@ export function App(): React.JSX.Element {
   // ── Navigation state ──
   const [screen, setScreen] = useState<Screen>("onboarding");
   const screenRef = useRef<Screen>("onboarding");
+  const screenKeyRef = useRef(0);
   const [userId, setUserId] = useState<string | null>(null);
   const isGuest = userId === null;
 
   const goToScreen = useCallback((s: Screen) => {
+    if (s === "home") screenKeyRef.current++;
     screenRef.current = s;
     setScreen(s);
   }, []);
@@ -150,6 +152,13 @@ export function App(): React.JSX.Element {
       send({ type: "settings:update", settings: { responseEnabled, sttLanguage } });
     }
   }, [responseEnabled, sttLanguage, screen, send]);
+
+  // When response is toggled on in text results, request recommendations
+  useEffect(() => {
+    if (screen === "text" && responseEnabled && textCards.length > 0 && textRecs.length === 0) {
+      send({ type: "recommendations:request" });
+    }
+  }, [responseEnabled, screen, textCards.length, textRecs.length, send]);
 
   // ── Audio capture (renderer-side mic → base64 WAV → backend via WS) ──
   const { startCapture, stopCapture, isCapturing, error: audioError, analyser } = useAudioCapture({ send, mode: "online", captureSystem: audioSource === "mic+system" });
@@ -259,6 +268,14 @@ export function App(): React.JSX.Element {
     };
     setBookmarks((prev) => [...prev, bm]);
     send({ type: "bookmark:create", timestamp: ts });
+
+    // Highlight the most recent card
+    setCards((prev) => {
+      if (prev.length === 0) return prev;
+      const updated = [...prev];
+      updated[updated.length - 1] = { ...updated[updated.length - 1], isHighlighted: true };
+      return updated;
+    });
   };
 
   const handleTextAnalyze = async (text: string) => {
@@ -385,7 +402,7 @@ export function App(): React.JSX.Element {
       )}
 
       {screen === "home" && (
-        <div key="home" className="screen-enter h-full">
+        <div key={`home-${screenKeyRef.current}`} className="screen-enter h-full">
         <HomeScreen
           onStart={handleStart}
           onTextMode={() => {
@@ -402,7 +419,6 @@ export function App(): React.JSX.Element {
       )}
 
       {screen === "live" && (
-        <div key="live" className="screen-enter h-full">
         <LiveSession
           cards={cards}
           currentCard={currentCard}
@@ -424,12 +440,11 @@ export function App(): React.JSX.Element {
           responseEnabled={responseEnabled}
           onResponseEnabledChange={setResponseEnabled}
         />
-        </div>
       )}
 
       {screen === "processing" && (
-        <div className="flex flex-col items-center justify-center h-full bg-background text-foreground gap-4">
-          <span className="font-serif italic text-lg text-muted">Processing...</span>
+        <div key="processing" className="screen-enter flex flex-col items-center justify-center h-full bg-background text-foreground gap-4">
+          <span className="font-sans text-sm text-[#93918E]">Processing...</span>
           <div className="h-px bg-border overflow-hidden" style={{ animation: "expandLine 2s ease-in-out infinite" }} />
         </div>
       )}
@@ -468,6 +483,8 @@ export function App(): React.JSX.Element {
           cards={textCards}
           recommendations={textRecs}
           analyzing={analyzing}
+          responseEnabled={responseEnabled}
+          onResponseEnabledChange={setResponseEnabled}
         />
         </div>
       )}

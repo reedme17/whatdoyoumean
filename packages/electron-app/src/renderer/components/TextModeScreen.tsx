@@ -7,6 +7,9 @@ import React, { useState } from "react";
 import type { CoreMeaningCard, Recommendation } from "@wdym/shared";
 import { RecapScreen } from "./RecapScreen.js";
 import { XIcon } from "./ui/x-icon.js";
+import { SlidersHorizontalIcon } from "./ui/sliders-icon.js";
+import { Popover, PopoverTrigger, PopoverContent } from "./ui/popover.js";
+import { Tabs, TabsList, TabsTrigger } from "./ui/tabs.js";
 
 interface Props {
   onAnalyze: (text: string) => void;
@@ -15,6 +18,8 @@ interface Props {
   cards: CoreMeaningCard[];
   recommendations: Recommendation[];
   analyzing: boolean;
+  responseEnabled?: boolean;
+  onResponseEnabledChange?: (v: boolean) => void;
 }
 
 export function TextModeScreen({
@@ -24,6 +29,8 @@ export function TextModeScreen({
   cards,
   recommendations,
   analyzing,
+  responseEnabled = false,
+  onResponseEnabledChange,
 }: Props): React.JSX.Element {
   const [text, setText] = useState("");
   const hasResults = cards.length > 0;
@@ -49,6 +56,8 @@ export function TextModeScreen({
         title="Results"
         actionLabel="Analyze another"
         showSpeakers={false}
+        responseEnabled={responseEnabled}
+        onResponseEnabledChange={onResponseEnabledChange}
       />
     );
   }
@@ -81,13 +90,30 @@ export function TextModeScreen({
         >
           {analyzing ? "Analyzing..." : "Analyze"}
         </button>
-        <button
-          className="text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none"
-          onClick={onClose}
-          aria-label="Close text mode"
-        >
-          <XIcon size={20} />
-        </button>
+        <div className="flex items-center gap-3">
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="text-[#93918E] hover:text-[#60594D] transition-colors cursor-pointer bg-transparent border-none p-0">
+                <SlidersHorizontalIcon size={16} />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="top" align="end" className="w-[160px] p-3">
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-sans font-medium text-[#60594D]">Response recommendation</span>
+                <Tabs value={responseEnabled ? "on" : "off"} onValueChange={(v) => onResponseEnabledChange?.(v === "on")}>
+                  <TabsList><TabsTrigger value="on">On</TabsTrigger><TabsTrigger value="off">Off</TabsTrigger></TabsList>
+                </Tabs>
+              </div>
+            </PopoverContent>
+          </Popover>
+          <button
+            className="text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none"
+            onClick={onClose}
+            aria-label="Close text mode"
+          >
+            <XIcon size={20} />
+          </button>
+        </div>
       </div>
     </div>
   );

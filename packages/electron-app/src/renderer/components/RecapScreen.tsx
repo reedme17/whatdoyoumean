@@ -6,7 +6,11 @@
 import React, { useState, useEffect } from "react";
 import type { CoreMeaningCard, Recommendation, Bookmark } from "@wdym/shared";
 import { CoreMeaningCardView } from "./CoreMeaningCard.js";
+import { RecommendationTokens } from "./RecommendationTokens.js";
 import { XIcon } from "./ui/x-icon.js";
+import { SlidersHorizontalIcon } from "./ui/sliders-icon.js";
+import { Popover, PopoverTrigger, PopoverContent } from "./ui/popover.js";
+import { Tabs, TabsList, TabsTrigger } from "./ui/tabs.js";
 
 interface Props {
   cards: CoreMeaningCard[];
@@ -21,10 +25,13 @@ interface Props {
   actionLabel?: string;
   showSpeakers?: boolean;
   speakerName?: string;
+  responseEnabled?: boolean;
+  onResponseEnabledChange?: (v: boolean) => void;
 }
 
 export function RecapScreen({
   cards,
+  recommendations,
   bookmarks,
   speakers,
   onExport,
@@ -35,6 +42,8 @@ export function RecapScreen({
   actionLabel = "New session",
   showSpeakers = true,
   speakerName,
+  responseEnabled = false,
+  onResponseEnabledChange,
 }: Props): React.JSX.Element {
   // Suppress hover on X icon for 300ms after mount (End button overlaps X position)
   const [xReady, setXReady] = useState(false);
@@ -51,6 +60,9 @@ export function RecapScreen({
       speakerGroups.push({ speaker, cards: [card] });
     }
   }
+
+  // Count highlighted cards for staggered animation
+  let highlightCounter = 0;
 
   return (
     <div className="flex flex-col h-full bg-background" role="main" aria-label="Session recap">
@@ -72,7 +84,7 @@ export function RecapScreen({
                 {group.cards.map((card, i) => (
                   <React.Fragment key={card.id}>
                     {i > 0 && <div className="w-full h-px bg-border" />}
-                    <CoreMeaningCardView card={card} />
+                    <CoreMeaningCardView card={card} animateHighlight highlightIndex={card.isHighlighted ? highlightCounter++ : 0} />
                   </React.Fragment>
                 ))}
               </div>
@@ -82,6 +94,13 @@ export function RecapScreen({
           {cards.length === 0 && (
             <div className="text-muted text-sm text-center mt-16 font-serif italic">
               No cards in this session.
+            </div>
+          )}
+
+          {/* Recommendations below cards */}
+          {recommendations.length > 0 && (
+            <div className="px-[20px] -mt-[8px]">
+              <RecommendationTokens recommendations={recommendations} />
             </div>
           )}
         </div>
@@ -95,14 +114,33 @@ export function RecapScreen({
         >
           {actionLabel}
         </button>
-        <button
-          className="text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none"
-          style={xReady ? undefined : { pointerEvents: "none" }}
-          onClick={onClose}
-          aria-label="Close recap"
-        >
-          <XIcon size={20} />
-        </button>
+        <div className="flex items-center gap-3">
+          {onResponseEnabledChange && (
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="text-[#93918E] hover:text-[#60594D] transition-colors cursor-pointer bg-transparent border-none p-0">
+                <SlidersHorizontalIcon size={16} />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="top" align="end" className="w-[160px] p-3">
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-sans font-medium text-[#60594D]">Response recommendation</span>
+                <Tabs value={responseEnabled ? "on" : "off"} onValueChange={(v) => onResponseEnabledChange?.(v === "on")}>
+                  <TabsList><TabsTrigger value="on">On</TabsTrigger><TabsTrigger value="off">Off</TabsTrigger></TabsList>
+                </Tabs>
+              </div>
+            </PopoverContent>
+          </Popover>
+          )}
+          <button
+            className="text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none"
+            style={xReady ? undefined : { pointerEvents: "none" }}
+            onClick={onClose}
+            aria-label="Close recap"
+          >
+            <XIcon size={20} />
+          </button>
+        </div>
       </div>
     </div>
   );

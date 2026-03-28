@@ -65,7 +65,9 @@ export function useSocket(onEvent: ServerEventHandler): UseSocketReturn {
 
   const send = useCallback(
     (event: { type: string; [key: string]: unknown }) => {
-      console.log("[WS] Sending:", event.type, socketRef.current?.connected ? "(connected)" : "(NOT connected)");
+      if (event.type !== "audio:chunk") {
+        console.log("[WS] Sending:", event.type, socketRef.current?.connected ? "(connected)" : "(NOT connected)");
+      }
       socketRef.current?.emit(event.type, event);
     },
     []

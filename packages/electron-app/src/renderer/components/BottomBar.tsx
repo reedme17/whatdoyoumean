@@ -46,6 +46,15 @@ interface Props {
 export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false, pendingPreview = "", pendingTextRef, sttLanguage = "zh+en", onSttLanguageChange, responseEnabled = false, onResponseEnabledChange, speakerName }: Props): React.JSX.Element {
   const outerRef = useRef<HTMLDivElement>(null);
   const pendingBlockRef = useRef<HTMLDivElement>(null);
+  const [showMarked, setShowMarked] = useState(false);
+
+  // Debug: log BottomBar position on mount
+  useEffect(() => {
+    if (outerRef.current) {
+      const r = outerRef.current.getBoundingClientRect();
+      console.log(`[BottomBar] mount rect: top=${r.top.toFixed(0)} left=${r.left.toFixed(0)} w=${r.width.toFixed(0)} h=${r.height.toFixed(0)} innerH=${window.innerHeight}`);
+    }
+  }, []);
   const speakerRef = useRef<HTMLSpanElement>(null);
   const textRef = useRef<HTMLSpanElement>(null);
   const prevPreviewRef = useRef("");
@@ -140,8 +149,8 @@ export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false
       ref={outerRef}
       role="toolbar"
       aria-label="Session controls"
-      className="flex flex-col items-start px-[20px] py-[20px] bg-[#F0EDE8] w-full -mb-[100px] relative overflow-visible"
-      style={{ borderRadius: "16px 16px 10px 10px", paddingBottom: 120, gap: 0 }}
+      className="flex flex-col items-start px-[20px] py-[20px] bg-[#F0EDE8] w-full -mb-[200px] relative overflow-visible"
+      style={{ borderRadius: "16px 16px 10px 10px", paddingBottom: 220, gap: 0 }}
     >
       {/* Pending block — always in DOM, hidden when empty */}
       <div
@@ -177,14 +186,25 @@ export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false
           <ListeningDots />
         </div>
 
-        <button
-          className="shrink-0 text-[#93918E] hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0"
-          onClick={onFlag}
-          title="Flag this moment (⌘B)"
-          aria-label="Flag this moment"
-        >
-          <MapPinPlusIcon size={20} />
-        </button>
+        <div className="relative shrink-0">
+          {showMarked && (
+            <div className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-sans text-[#60594D] bg-white/90 px-2 py-0.5 rounded-md shadow-sm" style={{ animation: "fadeInUp 0.2s ease-out, fadeOut 0.3s ease-in 1s forwards" }}>
+              Moment marked
+            </div>
+          )}
+          <button
+            className="text-[#93918E] hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0"
+            onClick={() => {
+              onFlag();
+              setShowMarked(true);
+              setTimeout(() => setShowMarked(false), 1500);
+            }}
+            title="Mark this moment (⌘B)"
+            aria-label="Mark this moment"
+          >
+            <MapPinPlusIcon size={20} />
+          </button>
+        </div>
 
         <div className="flex-1 min-w-0 flex items-center justify-end gap-[16px]">
           <Popover>
@@ -220,7 +240,7 @@ export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false
                   </Tabs>
                 </div>
                 <div className="flex flex-col gap-1">
-                  <span className="text-[10px] font-sans font-medium text-[#60594D]">Response</span>
+                  <span className="text-[10px] font-sans font-medium text-[#60594D]">Response recommendation</span>
                   <Tabs value={responseEnabled ? "on" : "off"} onValueChange={(v) => onResponseEnabledChange?.(v === "on")}>
                     <TabsList>
                       <TabsTrigger value="on">On</TabsTrigger>

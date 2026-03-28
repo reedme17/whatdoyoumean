@@ -853,3 +853,65 @@ Replaced 6 meaning categories with a cleaner set. Removed `factual_statement` (�
 - `packages/electron-app/src/renderer/components/RecommendationTokens.tsx` (display-only, no copy)
 - `packages/electron-app/src/renderer/components/TextModeScreen.tsx` (title, placeholder, screen-enter)
 - `packages/electron-app/src/renderer/globals.css` (screenFadeIn keyframe)
+
+---
+
+## Phase 33: Deepgram Streaming STT + Major Pipeline Overhaul
+
+### Deepgram Streaming
+- New `deepgram-streaming.ts`: WebSocket client to Deepgram with interim/final results + utterance end detection
+- Auto-reconnect on disconnect (1s delay), keep-alive every 8s
+- Backend opens Deepgram stream on session:start, forwards raw PCM from audio:chunk (strips WAV header)
+- Frontend chunk interval reduced from 2s to 250ms for low-latency streaming
+- RMS silence filter removed — streaming mode needs continuous audio for Deepgram to detect utterance end
+- Language change mid-session restarts Deepgram stream (only when language actually changes)
+- Session:end waits 600ms for Deepgram to flush final results before finalizing
+
+### Consolidation Improvements
+- Sliding window: locks old cards after 3 passes, only re-analyzes new transcript window
+- Fuzzy dedup: 60% word overlap threshold instead of exact string match
+- Marked transcripts annotated with ⭐IMPORTANT in consolidation prompt
+- Highlight inheritance: if any old card was highlighted, best-matching new card inherits it
+- Backend also marks cards on bookmark:create (was frontend-only before)
+- Final consolidation on session:end: full transcript review with marks before recap
+
+### Mark Moment Feature
+- Click mark → highlights most recent card (frontend + backend)
+- Highlighter CSS: hand-drawn style yellow background with asymmetric border-radius, rotate, skew
+- Recap page: highlights animate left-to-right (draw-on effect, 0.6s staggered)
+- Hover tooltip: "Moment marked"
+- "Marked" toast appears above button for 1.5s on click
+- Button tooltip changed from "Flag" to "Mark"
+
+### Text Mode Enhancements
+- Response recommendations in text results (uses all raw transcript text, not just last card)
+- On-demand recommendations:request event when user toggles response on mid-results
+- Sliders popover on text input and results pages (response on/off only, right-aligned)
+- Session recap: no sliders (conditional rendering via onResponseEnabledChange prop)
+- Label: "Response recommendation" on all sliders
+
+### UI Polish
+- Page transitions: pure opacity fade (no translateY to avoid morph conflicts)
+- Home screen: keyed wrapper for fade-in on return, no animation on morph start
+- Processing screen: screen-enter animation, font matches BottomBar listening style (#93918E)
+- BottomBar sink: -mb-[200px], paddingBottom 220, morph height 260
+- Morph animation: 50ms settle delay for fixed positioning
+- Suppress audio:chunk console logs (too frequent at 4/sec)
+- Recommendation spacing reduced in RecapScreen (-mt-[8px])
+
+### Changed Files
+- `packages/backend/src/stt/providers/deepgram-streaming.ts` (new)
+- `packages/backend/src/ws/handler.ts` (streaming, consolidation, marks, final consolidation, recommendations:request)
+- `packages/backend/src/semantic/analyzer.ts` (dedup prompt, 5s timeout)
+- `packages/electron-app/src/renderer/hooks/useAudioCapture.ts` (250ms chunks, no RMS filter)
+- `packages/electron-app/src/renderer/hooks/useSocket.ts` (suppress audio:chunk log, cards:consolidated listener)
+- `packages/electron-app/src/renderer/App.tsx` (screen transitions, mark highlight, recommendations:request, response props)
+- `packages/electron-app/src/renderer/components/CoreMeaningCard.tsx` (highlighter-mark class, animate-draw)
+- `packages/electron-app/src/renderer/components/BottomBar.tsx` (mark toast, -mb-[200px], streaming speaker name)
+- `packages/electron-app/src/renderer/components/RecapScreen.tsx` (sliders, recommendations, highlight animation)
+- `packages/electron-app/src/renderer/components/TextModeScreen.tsx` (sliders, response props, title)
+- `packages/electron-app/src/renderer/components/RecommendationTokens.tsx` (display-only, no padding)
+- `packages/electron-app/src/renderer/components/HomeScreen.tsx` (morph height, settle delay)
+- `packages/electron-app/src/renderer/globals.css` (highlighter-mark, screenFadeIn, fadeOut)
+- `packages/electron-app/src/renderer/index.html` (cleaned up SVG filter)
+- `packages/shared/src/events.ts` (cards:consolidated event)

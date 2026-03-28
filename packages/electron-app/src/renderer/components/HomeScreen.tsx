@@ -63,16 +63,20 @@ export function HomeScreen({ onStart, onTextMode, onExpand, panelOpen }: Props):
     textControls.start({ opacity: 0, transition: { duration: 0.15 } });
 
     // Small delay to let fixed positioning apply
-    await new Promise((r) => setTimeout(r, 20));
+    await new Promise((r) => setTimeout(r, 50));
 
     // Animate to bottom bar position (bottom of window, full width)
     // BottomBar is ~158px tall with -mb-[100px], so top edge is at innerHeight - 60
     // but the element itself extends 100px below. Match that exactly.
+    // Morph endpoint must match BottomBar's actual getBoundingClientRect() in LiveSession.
+    // Measured: BottomBar top=413, height=267, innerHeight=480 → offset = innerHeight - top = 67
+    // BottomBar has: py-[20px] + content + paddingBottom:220 - mb-[200px] = ~267px total, ~67px visible
+    // If BottomBar layout changes, re-measure with the debug log in BottomBar.tsx
     await controls.start({
-      top: window.innerHeight - 60,
+      top: window.innerHeight - 67,
       left: 0,
       width: window.innerWidth,
-      height: 160,
+      height: 267,
       borderRadius: "16px 16px 10px 10px",
       transition: {
         type: "tween",

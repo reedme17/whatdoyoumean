@@ -23,12 +23,16 @@ interface Props {
   editable?: boolean;
   isCurrent?: boolean;
   onEdit?: (cardId: string, content: string) => void;
+  animateHighlight?: boolean;
+  highlightIndex?: number;
 }
 
 export function CoreMeaningCardView({
   card,
   editable = false,
   onEdit,
+  animateHighlight = false,
+  highlightIndex = 0,
 }: Props): React.JSX.Element {
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(card.content);
@@ -63,7 +67,8 @@ export function CoreMeaningCardView({
         </div>
       ) : (
         <span
-          className={`font-sans font-medium text-sm ${editable ? "cursor-pointer hover:text-muted transition-colors" : ""}`}
+          className={`font-sans font-medium text-sm ${editable ? "cursor-pointer hover:text-muted transition-colors" : ""} ${card.isHighlighted ? (animateHighlight ? "highlighter-mark animate-draw" : "highlighter-mark") : ""}`}
+          style={card.isHighlighted && animateHighlight ? { animationDelay: `${highlightIndex * 0.3 + 0.5}s` } : undefined}
           onClick={() => editable && setEditing(true)}
           title={editable ? "Click to edit" : undefined}
         >
