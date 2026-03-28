@@ -105,6 +105,16 @@ export function App(): React.JSX.Element {
         break;
       }
 
+      case "cards:consolidated": {
+        const consolidated = (event as Extract<ServerEvent, { type: "cards:consolidated" }>).cards;
+        const s = screenRef.current;
+        if (s === "live" || s === "processing") {
+          console.log(`[App] Cards consolidated: ${consolidated.length} cards`);
+          setCards(consolidated);
+        }
+        break;
+      }
+
       case "recommendation:new":
         setRecommendations(
           (event as Extract<ServerEvent, { type: "recommendation:new" }>).recommendations
@@ -421,6 +431,9 @@ export function App(): React.JSX.Element {
           speakers={speakers}
           onExport={handleExport}
           onClose={() => goToScreen("home")}
+          onAction={() => {
+            handleStart();
+          }}
           onEditCard={handleEditCard}
         />
       )}
@@ -432,6 +445,10 @@ export function App(): React.JSX.Element {
           onClose={() => {
             resetSession();
             goToScreen("home");
+          }}
+          onReset={() => {
+            setTextCards([]);
+            setTextRecs([]);
           }}
           cards={textCards}
           recommendations={textRecs}

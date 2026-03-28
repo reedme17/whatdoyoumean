@@ -778,3 +778,43 @@ Replaced 6 meaning categories with a cleaner set. Removed `factual_statement` (�
 - `packages/electron-app/src/renderer/components/CoreMeaningCard.tsx` (labels, fixed width)
 - `packages/electron-app/src/renderer/App.tsx` (fallback category)
 - All test files updated: analyzer.test.ts, visualization/engine.test.ts, ws/handler.test.ts, session/routes.test.ts, session/archive.test.ts, memory/service.test.ts
+
+---
+
+## Phase 31: Live Consolidation + UI Flow Fixes
+
+### Sliding Window Consolidation
+- After each card finalize (≥2 cards), triggers async consolidation pass (1s delay to avoid Cerebras rate limit)
+- Consolidation takes all transcripts in the current window, calls `analyzeMulti`, replaces window cards
+- Sliding window: after `MAX_WINDOW_PASSES` (3) analyses of the same transcript range, locks current cards and slides window forward
+- Locked cards are never re-analyzed — only new window transcripts get consolidated
+- Cross-window dedup: locked card contents added to seen set, window cards that duplicate locked content are filtered out
+- Version counter prevents stale consolidation results from overwriting newer state
+- `consolidationInFlight` flag prevents concurrent consolidation runs
+- New `cards:consolidated` ServerEvent replaces all frontend cards atomically
+- Frontend `App.tsx` handles `cards:consolidated` event with `setCards(consolidated)`
+- `useSocket.ts` registers `cards:consolidated` event listener
+
+### Prompt Improvements
+- Added "Do NOT produce duplicate or near-duplicate items" to `MULTI_SYSTEM_PROMPT`
+- Analysis timeout increased from 3s to 5s to reduce Cerebras free tier timeouts
+
+### RecapScreen Action Button Split
+- Added `onAction` prop to RecapScreen — action button uses `onAction` (if provided), X button always uses `onClose`
+- Audio recap: "New session" → calls `handleStart()` to directly begin new recording session
+- Text results: "Analyze another" → clears textCards and returns to text input page (via `onReset` prop on TextModeScreen)
+- Text results: X → returns to home
+
+### UI Text Changes
+- TextModeScreen title: "Text mode" → "Analyze text"
+- TextModeScreen placeholder: "Paste or type text here..."
+- Category badge "Action" → "To do"
+
+### Changed Files
+- `packages/shared/src/events.ts` (cards:consolidated event)
+- `packages/backend/src/ws/handler.ts` (consolidation state, runConsolidation, sliding window, 1s delay)
+- `packages/backend/src/semantic/analyzer.ts` (dedup prompt, 5s timeout)
+- `packages/electron-app/src/renderer/App.tsx` (cards:consolidated handler, onAction/onReset for recap/text)
+- `packages/electron-app/src/renderer/hooks/useSocket.ts` (cards:consolidated listener)
+- `packages/electron-app/src/renderer/components/RecapScreen.tsx` (onAction prop)
+- `packages/electron-app/src/renderer/components/TextModeScreen.tsx` (onReset prop, title, placeholder)

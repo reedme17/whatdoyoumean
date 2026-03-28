@@ -15,6 +15,7 @@ interface Props {
   speakers: Map<string, string>;
   onExport: () => void;
   onClose: () => void;
+  onAction?: () => void;
   onEditCard: (cardId: string, content: string) => void;
   title?: string;
   actionLabel?: string;
@@ -27,6 +28,7 @@ export function RecapScreen({
   speakers,
   onExport,
   onClose,
+  onAction,
   onEditCard,
   title = "Session recap",
   actionLabel = "New session",
@@ -87,7 +89,7 @@ export function RecapScreen({
       <div className="flex items-center justify-between px-[20px] pt-[12px] pb-[20px] shrink-0">
         <button
           className="font-sans font-bold text-sm text-[#5B5449] hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0"
-          onClick={onClose}
+          onClick={onAction ?? onClose}
         >
           {actionLabel}
         </button>

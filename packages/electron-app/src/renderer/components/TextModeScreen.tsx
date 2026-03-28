@@ -11,6 +11,7 @@ import { XIcon } from "./ui/x-icon.js";
 interface Props {
   onAnalyze: (text: string) => void;
   onClose: () => void;
+  onReset?: () => void;
   cards: CoreMeaningCard[];
   recommendations: Recommendation[];
   analyzing: boolean;
@@ -19,6 +20,7 @@ interface Props {
 export function TextModeScreen({
   onAnalyze,
   onClose,
+  onReset,
   cards,
   recommendations,
   analyzing,
@@ -38,6 +40,11 @@ export function TextModeScreen({
           navigator.clipboard.writeText(md);
         }}
         onClose={onClose}
+        onAction={() => {
+          // Reset to text input page
+          setText("");
+          onReset?.();
+        }}
         onEditCard={() => {}}
         title="Results"
         actionLabel="Analyze another"
@@ -50,7 +57,7 @@ export function TextModeScreen({
     <div className="flex flex-col h-full bg-background" role="main" aria-label="Text analysis mode">
       {/* Title */}
       <div className="pl-[20px] pt-[12px] shrink-0">
-        <h1 className="font-serif font-normal text-[20px] text-[#60594D]">Text mode</h1>
+        <h1 className="font-serif font-normal text-[20px] text-[#60594D]">Analyze text</h1>
       </div>
 
       {/* Content area */}

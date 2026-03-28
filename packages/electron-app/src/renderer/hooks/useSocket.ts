@@ -41,6 +41,7 @@ export function useSocket(onEvent: ServerEventHandler): UseSocketReturn {
       "transcript:final",
       "card:created",
       "card:updated",
+      "cards:consolidated",
       "recommendation:new",
       "topic:updated",
       "stt:provider_switch",

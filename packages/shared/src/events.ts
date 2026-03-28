@@ -41,6 +41,7 @@ export type ServerEvent =
   | { type: 'transcript:final'; segment: TranscriptSegment }
   | { type: 'card:created'; card: CoreMeaningCard }
   | { type: 'card:updated'; card: CoreMeaningCard }
+  | { type: 'cards:consolidated'; cards: CoreMeaningCard[] }
   | { type: 'recommendation:new'; recommendations: Recommendation[] }
   | { type: 'topic:updated'; topicMap: TopicMap }
   | { type: 'stt:provider_switch'; from: string; to: string }

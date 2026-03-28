@@ -39,7 +39,7 @@ interface AnalysisResult {
 
 const MAX_ENGLISH_WORDS = 30;
 const MAX_CHINESE_CHARS = 50;
-const ANALYSIS_TIMEOUT_MS = 3000;
+const ANALYSIS_TIMEOUT_MS = 5000;
 
 const VALID_CATEGORIES: MeaningCategory[] = [
   "fact",
@@ -256,6 +256,7 @@ const MULTI_SYSTEM_PROMPT = `You are a semantic analysis engine. Given a text pa
 
 CRITICAL: The "content" field MUST be in the SAME LANGUAGE as the input text.
 CRITICAL: Merge related clauses into ONE item. Do NOT split on commas or conjunctions. Each item should represent a complete, self-contained idea — not a sentence fragment.
+CRITICAL: Do NOT produce duplicate or near-duplicate items. If two clauses express the same idea, merge them into one.
 
 Respond ONLY with a valid JSON array. Each element has this format:
 {

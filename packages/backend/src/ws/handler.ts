@@ -52,6 +52,16 @@ interface SocketSessionState {
   /** STT language preference: "auto" | "zh" | "en" */
   responseEnabled: boolean;
   sttLanguage: string;
+  /** Consolidation: version counter to discard stale results */
+  consolidationVersion: number;
+  /** Consolidation: locked cards from previous windows (won't be re-analyzed) */
+  lockedCards: CoreMeaningCard[];
+  /** Consolidation: transcript index where current window starts */
+  windowStartIndex: number;
+  /** Consolidation: how many times the current window has been analyzed */
+  windowPassCount: number;
+  /** Consolidation: is a consolidation currently in flight */
+  consolidationInFlight: boolean;
 }
 
 /**
@@ -98,6 +108,11 @@ export function setupWebSocketHandlers(
       lastAudioTime: 0,
       sttLanguage: "auto",
       responseEnabled: false,
+      consolidationVersion: 0,
+      lockedCards: [],
+      windowStartIndex: 0,
+      windowPassCount: 0,
+      consolidationInFlight: false,
     };
 
     // Wire transcription engine callbacks
@@ -490,9 +505,106 @@ async function processFinalTranscript(
     } else {
       console.log("[WS] Recommendations disabled — skipping LLM call");
     }
+
+    // Trigger async consolidation pass (non-blocking, delayed to avoid rate limit)
+    if (state.cards.length >= 2) {
+      setTimeout(() => {
+        runConsolidation(socket, state, analyzer).catch((err) => {
+          console.error("[WS] Consolidation error:", err);
+        });
+      }, 1000);
+    }
   } catch (err) {
     console.error("[WS] Pipeline error:", err);
     emitError(socket, "pipeline", String(err), true);
+  }
+}
+
+/** Max times a window gets re-analyzed before locking */
+const MAX_WINDOW_PASSES = 3;
+
+async function runConsolidation(
+  socket: Socket,
+  state: SocketSessionState,
+  analyzer: SemanticAnalyzer,
+): Promise<void> {
+  // Skip if already in flight
+  if (state.consolidationInFlight) {
+    console.log("[WS] Consolidation already in flight — skipping");
+    return;
+  }
+
+  const totalTranscripts = state.transcripts.length;
+  const windowTranscripts = state.transcripts.slice(state.windowStartIndex);
+
+  // Nothing new in window
+  if (windowTranscripts.length === 0) return;
+
+  // Check if window has been analyzed too many times without new transcripts
+  const hasNewTranscripts = totalTranscripts > state.windowStartIndex + state.windowPassCount;
+  if (!hasNewTranscripts) {
+    state.windowPassCount++;
+  } else {
+    state.windowPassCount = 0;
+  }
+
+  if (state.windowPassCount >= MAX_WINDOW_PASSES) {
+    // Lock current window cards and slide window forward
+    console.log(`[WS] Window analyzed ${MAX_WINDOW_PASSES}x — locking ${state.cards.length - state.lockedCards.length} window cards`);
+    state.lockedCards = [...state.cards]; // all current cards become locked
+    state.windowStartIndex = totalTranscripts; // window starts at next new transcript
+    state.windowPassCount = 0;
+    return;
+  }
+
+  state.consolidationInFlight = true;
+  const version = ++state.consolidationVersion;
+
+  // Build text from window transcripts only
+  const windowText = windowTranscripts
+    .map((t) => `[${t.speakerId}] ${t.text}`)
+    .join("\n");
+
+  const langResult = state.languageDetector.detectFromText(windowText);
+
+  console.log(`[WS] Consolidation v${version} starting — window [${state.windowStartIndex}..${totalTranscripts}], ${windowText.length} chars, ${state.lockedCards.length} locked cards`);
+
+  try {
+    const windowCards = await analyzer.analyzeMulti(windowText, langResult.primaryLanguage);
+
+    // Check if this consolidation is still current
+    if (version !== state.consolidationVersion) {
+      console.log(`[WS] Consolidation v${version} stale (current: v${state.consolidationVersion}) — discarding`);
+      return;
+    }
+
+    // Deduplicate by normalized content
+    const seen = new Set<string>();
+    // Add locked card contents to seen set so window cards don't duplicate them
+    for (const lc of state.lockedCards) {
+      seen.add(lc.content.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]/g, ""));
+    }
+    const dedupedCards = windowCards.filter((card) => {
+      const key = card.content.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]/g, "");
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    for (const card of dedupedCards) {
+      card.sessionId = state.sessionId!;
+    }
+
+    const allCards = [...state.lockedCards, ...dedupedCards];
+
+    console.log(`[WS] Consolidation v${version} complete — ${dedupedCards.length} window cards + ${state.lockedCards.length} locked = ${allCards.length} total (before dedup: ${windowCards.length})`);
+
+    state.cards = allCards;
+    emitServerEvent(socket, { type: "cards:consolidated", cards: allCards });
+  } catch (err) {
+    console.error(`[WS] Consolidation v${version} failed:`, err);
+  } finally {
+    state.consolidationInFlight = false;
   }
 }
 
