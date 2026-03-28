@@ -818,3 +818,38 @@ Replaced 6 meaning categories with a cleaner set. Removed `factual_statement` (�
 - `packages/electron-app/src/renderer/hooks/useSocket.ts` (cards:consolidated listener)
 - `packages/electron-app/src/renderer/components/RecapScreen.tsx` (onAction prop)
 - `packages/electron-app/src/renderer/components/TextModeScreen.tsx` (onReset prop, title, placeholder)
+
+---
+
+## Phase 32: UI Polish — Speaker Name, Recommendations, Page Transitions
+
+### Speaker Name Persistence
+- Added `speakerName` state in App.tsx, passed to LiveSession and RecapScreen
+- LiveSession: "Add name" popover now functional — Save/Cancel/Enter all work
+- After saving, "Add name" button changes to "Edit", speaker label shows actual name
+- Name persists across live session and recap within the same session
+- RecapScreen accepts `speakerName` prop as fallback when speakers Map has no match
+
+### Recommendation Tokens
+- Moved from fixed position (between cards and waveform) to inside scroll area, below last card
+- Removed `pl-[48px]` wrapper — arrow icon now left-aligned with badge column
+- Removed copy-on-click functionality — pills are now display-only `<span>` elements
+- Removed unused `useState` import
+
+### Page Transition Animations
+- Added `screenFadeIn` keyframe: 0.3s ease-out, opacity 0→1 + translateY 6px→0
+- `.screen-enter` CSS class applied to home, live, recap, text screen wrappers in App.tsx
+- TextModeScreen input page also has `screen-enter` for "Analyze another" transition
+
+### UI Text
+- TextModeScreen title: "Analyze text"
+- TextModeScreen placeholder: "Paste or type text here..."
+- Input focus ring thinned from `ring-1` to `ring-[0.5px]`
+
+### Changed Files
+- `packages/electron-app/src/renderer/App.tsx` (speakerName state, screen wrappers, props)
+- `packages/electron-app/src/renderer/components/LiveSession.tsx` (speaker rename, recommendations position)
+- `packages/electron-app/src/renderer/components/RecapScreen.tsx` (speakerName prop)
+- `packages/electron-app/src/renderer/components/RecommendationTokens.tsx` (display-only, no copy)
+- `packages/electron-app/src/renderer/components/TextModeScreen.tsx` (title, placeholder, screen-enter)
+- `packages/electron-app/src/renderer/globals.css` (screenFadeIn keyframe)

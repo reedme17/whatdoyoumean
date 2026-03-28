@@ -54,7 +54,7 @@ export function TextModeScreen({
   }
 
   return (
-    <div className="flex flex-col h-full bg-background" role="main" aria-label="Text analysis mode">
+    <div className="flex flex-col h-full bg-background screen-enter" role="main" aria-label="Text analysis mode">
       {/* Title */}
       <div className="pl-[20px] pt-[12px] shrink-0">
         <h1 className="font-serif font-normal text-[20px] text-[#60594D]">Analyze text</h1>

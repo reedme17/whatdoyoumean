@@ -57,7 +57,8 @@ export function App(): React.JSX.Element {
   const [currentCard, setCurrentCard] = useState<CoreMeaningCard | null>(null);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
-  const [speakers] = useState<Map<string, string>>(new Map());
+  const [speakers, setSpeakers] = useState<Map<string, string>>(new Map());
+  const [speakerName, setSpeakerName] = useState("");
   const sessionStartRef = useRef<number>(0);
   const [audioSource, setAudioSource] = useState<"mic" | "mic+system">("mic");
   const [sttLanguage, setSttLanguage] = useState<SttLanguage>("zh+en");
@@ -383,6 +384,7 @@ export function App(): React.JSX.Element {
       )}
 
       {screen === "home" && (
+        <div key="home" className="screen-enter h-full">
         <HomeScreen
           onStart={handleStart}
           onTextMode={() => {
@@ -395,9 +397,11 @@ export function App(): React.JSX.Element {
           onToggleAudioSource={() => setAudioSource((s) => s === "mic" ? "mic+system" : "mic")}
           sttLanguage={sttLanguage}
         />
+        </div>
       )}
 
       {screen === "live" && (
+        <div key="live" className="screen-enter h-full">
         <LiveSession
           cards={cards}
           currentCard={currentCard}
@@ -408,12 +412,18 @@ export function App(): React.JSX.Element {
           analyser={analyser}
           onFlag={handleFlag}
           onStop={handleStop}
+          onSpeakerRename={(name) => {
+            setSpeakerName(name);
+            setSpeakers(new Map([["speaker_0", name]]));
+          }}
+          speakerName={speakerName}
           pendingPreview={pendingPreview}
           sttLanguage={sttLanguage}
           onSttLanguageChange={setSttLanguage}
           responseEnabled={responseEnabled}
           onResponseEnabledChange={setResponseEnabled}
         />
+        </div>
       )}
 
       {screen === "processing" && (
@@ -424,6 +434,7 @@ export function App(): React.JSX.Element {
       )}
 
       {screen === "recap" && (
+        <div key="recap" className="screen-enter h-full">
         <RecapScreen
           cards={cards}
           recommendations={recommendations}
@@ -435,11 +446,14 @@ export function App(): React.JSX.Element {
             handleStart();
           }}
           onEditCard={handleEditCard}
+          speakerName={speakerName}
         />
+        </div>
       )}
 
 
       {screen === "text" && (
+        <div key="text" className="screen-enter h-full">
         <TextModeScreen
           onAnalyze={handleTextAnalyze}
           onClose={() => {
@@ -454,6 +468,7 @@ export function App(): React.JSX.Element {
           recommendations={textRecs}
           analyzing={analyzing}
         />
+        </div>
       )}
 
       {/* Expand panel overlay */}

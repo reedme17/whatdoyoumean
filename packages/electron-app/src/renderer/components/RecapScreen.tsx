@@ -20,6 +20,7 @@ interface Props {
   title?: string;
   actionLabel?: string;
   showSpeakers?: boolean;
+  speakerName?: string;
 }
 
 export function RecapScreen({
@@ -33,6 +34,7 @@ export function RecapScreen({
   title = "Session recap",
   actionLabel = "New session",
   showSpeakers = true,
+  speakerName,
 }: Props): React.JSX.Element {
   // Suppress hover on X icon for 300ms after mount (End button overlaps X position)
   const [xReady, setXReady] = useState(false);
@@ -41,7 +43,7 @@ export function RecapScreen({
   // Group cards by speaker
   const speakerGroups: { speaker: string; cards: CoreMeaningCard[] }[] = [];
   for (const card of cards) {
-    const speaker = speakers.get(card.sourceSegmentIds[0] ?? "") ?? "Speaker 1";
+    const speaker = speakers.get(card.sourceSegmentIds[0] ?? "") ?? speakerName ?? "Speaker 1";
     const last = speakerGroups[speakerGroups.length - 1];
     if (last && last.speaker === speaker) {
       last.cards.push(card);

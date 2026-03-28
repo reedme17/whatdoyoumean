@@ -23,6 +23,8 @@ interface Props {
   analyser?: AnalyserNode | null;
   onFlag: () => void;
   onStop: () => void;
+  onSpeakerRename?: (name: string) => void;
+  speakerName?: string;
   pendingPreview?: string;
   sttLanguage?: SttLanguage;
   onSttLanguageChange?: (lang: SttLanguage) => void;
@@ -38,6 +40,8 @@ export function LiveSession({
   analyser = null,
   onFlag,
   onStop,
+  onSpeakerRename,
+  speakerName,
   pendingPreview = "",
   sttLanguage,
   onSttLanguageChange,
@@ -47,6 +51,8 @@ export function LiveSession({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
   const pendingTextRef = useRef<HTMLDivElement>(null);
+  const [nameInput, setNameInput] = useState("");
+  const [namePopoverOpen, setNamePopoverOpen] = useState(false);
 
   useEffect(() => {
     if (autoScroll && scrollRef.current) {
@@ -76,21 +82,29 @@ export function LiveSession({
           {cards.length > 0 && (
             <div className="flex flex-col gap-[10px] px-[20px] py-[12px]">
               <div className="flex items-baseline gap-[10px]">
-                <span className="font-sans font-semibold text-sm text-[#60594D]">Speaker 1</span>
-                <Popover>
+                <span className="font-sans font-semibold text-sm text-[#60594D]">{speakerName || "Speaker 1"}</span>
+                <Popover open={namePopoverOpen} onOpenChange={setNamePopoverOpen}>
                   <PopoverTrigger asChild>
-                    <Button variant="small" className="leading-[20px]">Add name</Button>
+                    <Button variant="small" className="leading-[20px]">{speakerName ? "Edit" : "Add name"}</Button>
                   </PopoverTrigger>
                   <PopoverContent side="right" align="start" className="w-[200px] p-3">
                     <div className="flex flex-col gap-2">
                       <input
-                        className="w-full px-2 py-1 text-xs font-sans border border-border rounded-md bg-transparent text-foreground outline-none focus:border-[#60594D] focus:ring-1 focus:ring-[#60594D] caret-[#60594D]"
+                        className="w-full px-2 py-1 text-xs font-sans border border-border rounded-md bg-transparent text-foreground outline-none focus:border-[#60594D] focus:ring-[0.5px] focus:ring-[#60594D] caret-[#60594D]"
                         placeholder="Enter name..."
+                        value={nameInput}
+                        onChange={(e) => setNameInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && nameInput.trim()) {
+                            onSpeakerRename?.(nameInput.trim());
+                            setNamePopoverOpen(false);
+                          }
+                        }}
                         autoFocus
                       />
                       <div className="flex justify-end gap-2">
-                        <button className="text-[10px] font-sans text-[#93918E] hover:text-foreground cursor-pointer bg-transparent border-none">Cancel</button>
-                        <button className="text-[10px] font-sans font-medium text-[#5B5449] hover:text-foreground cursor-pointer bg-transparent border-none">Save</button>
+                        <button className="text-[10px] font-sans text-[#93918E] hover:text-foreground cursor-pointer bg-transparent border-none" onClick={() => setNamePopoverOpen(false)}>Cancel</button>
+                        <button className="text-[10px] font-sans font-medium text-[#5B5449] hover:text-foreground cursor-pointer bg-transparent border-none" onClick={() => { if (nameInput.trim()) { onSpeakerRename?.(nameInput.trim()); setNamePopoverOpen(false); } }}>Save</button>
                       </div>
                     </div>
                   </PopoverContent>
@@ -104,6 +118,10 @@ export function LiveSession({
                   </React.Fragment>
                 ))}
               </div>
+              {/* Recommendations below last card, aligned with badge column */}
+              {responseEnabled && recommendations.length > 0 && (
+                <RecommendationTokens recommendations={recommendations} />
+              )}
             </div>
           )}
         </div>
@@ -111,8 +129,6 @@ export function LiveSession({
         {/* Empty state — just blank space, bottom bar has Listening indicator */}
         {cards.length === 0 && !pendingPreview && null}
       </div>
-
-      {responseEnabled && <RecommendationTokens recommendations={recommendations} />}
 
       {/* Full-width waveform above bottom bar */}
       <div className="w-full px-[20px] shrink-0">
