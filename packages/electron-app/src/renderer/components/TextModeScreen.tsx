@@ -6,6 +6,7 @@
 import React, { useState } from "react";
 import type { CoreMeaningCard, Recommendation } from "@wdym/shared";
 import { RecapScreen } from "./RecapScreen.js";
+import { Button } from "./ui/button.js";
 import { XIcon } from "./ui/x-icon.js";
 import { SlidersHorizontalIcon } from "./ui/sliders-icon.js";
 import { Popover, PopoverTrigger, PopoverContent } from "./ui/popover.js";
@@ -82,15 +83,15 @@ export function TextModeScreen({
       </div>
 
       {/* Bottom bar */}
-      <div className="flex items-center justify-between px-[20px] pt-[12px] pb-[20px] shrink-0">
-        <button
-          className="font-sans font-bold text-sm text-[#5B5449] hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0 disabled:opacity-40 disabled:cursor-not-allowed"
+      <div className="flex items-center justify-center px-[20px] pt-[12px] pb-[20px] shrink-0 relative">
+        <Button
+          variant="normal"
           onClick={() => text.trim() && onAnalyze(text)}
           disabled={!text.trim() || analyzing}
         >
           {analyzing ? "Analyzing..." : "Analyze"}
-        </button>
-        <div className="flex items-center gap-3">
+        </Button>
+        <div className="absolute right-[20px] flex items-center gap-3">
           <Popover>
             <PopoverTrigger asChild>
               <button className="text-[#93918E] hover:text-[#60594D] transition-colors cursor-pointer bg-transparent border-none p-0">

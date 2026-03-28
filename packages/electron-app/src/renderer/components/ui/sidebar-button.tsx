@@ -17,7 +17,7 @@ const SidebarButton = React.forwardRef<HTMLButtonElement, SidebarButtonProps>(
       ref={ref}
       className={cn(
         "flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-sans transition-colors cursor-pointer",
-        "text-[#60594D] hover:bg-[#F0EDE8] hover:text-[#5B5449]",
+        "text-[#60594D] font-semibold hover:bg-[#F0EDE8] hover:text-[#5B5449]",
         active && "bg-[#F0EDE8] text-[#5B5449] font-semibold",
         locked && "opacity-40 cursor-not-allowed",
         className

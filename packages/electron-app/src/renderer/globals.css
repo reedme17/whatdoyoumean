@@ -104,6 +104,25 @@ button, a, input, textarea, select, [role="button"] {
   to { opacity: 0; }
 }
 
+/* Popover enter/exit animations */
+@keyframes popoverIn {
+  from { opacity: 0; transform: scale(0.95) translateY(4px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes popoverOut {
+  from { opacity: 1; transform: scale(1) translateY(0); }
+  to { opacity: 0; transform: scale(0.95) translateY(4px); }
+}
+
+[data-state="open"].popover-animated {
+  animation: popoverIn 0.15s ease-out;
+}
+
+[data-state="closed"].popover-animated {
+  animation: popoverOut 0.1s ease-in;
+}
+
 .highlighter-mark {
   background-image: linear-gradient(
     104deg,

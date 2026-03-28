@@ -915,3 +915,38 @@ Replaced 6 meaning categories with a cleaner set. Removed `factual_statement` (�
 - `packages/electron-app/src/renderer/globals.css` (highlighter-mark, screenFadeIn, fadeOut)
 - `packages/electron-app/src/renderer/index.html` (cleaned up SVG filter)
 - `packages/shared/src/events.ts` (cards:consolidated event)
+
+---
+
+## Phase 34: UI Polish — Panel, Popover Animations, Text Mode, Colors
+
+### ExpandPanel Cleanup
+- Removed Sign In, Sign Out, Profile, Terminology (commented out / deleted)
+- About section: font-sans (system font), added "What Do You Mean" English name, author "Ting Yan"
+- About colors: 啥意思 #60594D (theme), WDYM + v0.1.0 + author = text-muted (#8C8578)
+- About spacing: flex-col gap-0.5 for uniform line spacing
+- SidebarButton: font-semibold (was normal)
+
+### Popover Animations
+- Added popoverIn/popoverOut CSS keyframes (scale + fade + translateY)
+- PopoverContent uses `.popover-animated` class with data-state selectors
+- All popovers (sliders, add name) now have 0.15s enter / 0.1s exit animation
+
+### Text Mode
+- Analyze button: normal variant Button (pill, bg #F0EDE8, centered)
+- Sliders + X positioned absolute right
+- Empty recommendations: "No available response recommendation" fallback text (#93918E)
+- Response toggle on/off controls recommendation visibility in RecapScreen
+
+### Color Consistency
+- RecapScreen action button (New session / Analyze another): text-muted default, hover text-foreground (matches X icon)
+- Response label: "Response recommendation" on all sliders
+
+### Changed Files
+- `packages/electron-app/src/renderer/components/ExpandPanel.tsx` (rewritten)
+- `packages/electron-app/src/renderer/components/RecapScreen.tsx` (action button color, response toggle)
+- `packages/electron-app/src/renderer/components/TextModeScreen.tsx` (Button, centered, sliders)
+- `packages/electron-app/src/renderer/components/RecommendationTokens.tsx` (empty filter, fallback)
+- `packages/electron-app/src/renderer/components/ui/popover.tsx` (popover-animated class)
+- `packages/electron-app/src/renderer/components/ui/sidebar-button.tsx` (font-semibold)
+- `packages/electron-app/src/renderer/globals.css` (popover keyframes)

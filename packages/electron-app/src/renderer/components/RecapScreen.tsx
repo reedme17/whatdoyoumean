@@ -98,7 +98,7 @@ export function RecapScreen({
           )}
 
           {/* Recommendations below cards */}
-          {recommendations.length > 0 && (
+          {responseEnabled && recommendations.length > 0 && (
             <div className="px-[20px] -mt-[8px]">
               <RecommendationTokens recommendations={recommendations} />
             </div>
@@ -109,7 +109,7 @@ export function RecapScreen({
       {/* Bottom bar */}
       <div className="flex items-center justify-between px-[20px] pt-[12px] pb-[20px] shrink-0">
         <button
-          className="font-sans font-bold text-sm text-[#5B5449] hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0"
+          className="font-sans font-bold text-sm text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0"
           onClick={onAction ?? onClose}
         >
           {actionLabel}
