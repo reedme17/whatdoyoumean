@@ -243,6 +243,13 @@ export function setupWebSocketHandlers(
         state.responseEnabled = data.settings.responseEnabled === true;
         console.log("[WS] Settings updated — responseEnabled:", state.responseEnabled);
       }
+      if (data.settings?.sttLanguage !== undefined) {
+        const lang = data.settings.sttLanguage as string;
+        if (lang === "zh+en" || lang === "zh" || lang === "en" || lang === "auto") {
+          state.sttLanguage = lang;
+          console.log("[WS] Settings updated — sttLanguage:", state.sttLanguage);
+        }
+      }
     });
 
     socket.on("text:submit", (data: Extract<ClientEvent, { type: "text:submit" }>) => {

@@ -144,12 +144,12 @@ export function App(): React.JSX.Element {
 
   const { send } = useSocket(handleServerEvent);
 
-  // Send settings:update to backend when response toggle changes mid-session
+  // Send settings:update to backend when response toggle or language changes mid-session
   useEffect(() => {
     if (screen === "live") {
-      send({ type: "settings:update", settings: { responseEnabled } });
+      send({ type: "settings:update", settings: { responseEnabled, sttLanguage } });
     }
-  }, [responseEnabled, screen, send]);
+  }, [responseEnabled, sttLanguage, screen, send]);
 
   // ── Audio capture (renderer-side mic → base64 WAV → backend via WS) ──
   const { startCapture, stopCapture, isCapturing, error: audioError, analyser } = useAudioCapture({ send, mode: "online", captureSystem: audioSource === "mic+system" });
@@ -177,6 +177,7 @@ export function App(): React.JSX.Element {
     setTextRecs([]);
     setAnalyzing(false);
     setPendingPreview("");
+    setSpeakerName("");
   };
 
   const handleStart = async () => {

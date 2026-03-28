@@ -146,6 +146,7 @@ export function LiveSession({
         onSttLanguageChange={onSttLanguageChange}
         responseEnabled={responseEnabled}
         onResponseEnabledChange={onResponseEnabledChange}
+        speakerName={speakerName}
       />
     </div>
   );

@@ -40,9 +40,10 @@ interface Props {
   onSttLanguageChange?: (lang: SttLanguage) => void;
   responseEnabled?: boolean;
   onResponseEnabledChange?: (v: boolean) => void;
+  speakerName?: string;
 }
 
-export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false, pendingPreview = "", pendingTextRef, sttLanguage = "zh+en", onSttLanguageChange, responseEnabled = false, onResponseEnabledChange }: Props): React.JSX.Element {
+export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false, pendingPreview = "", pendingTextRef, sttLanguage = "zh+en", onSttLanguageChange, responseEnabled = false, onResponseEnabledChange, speakerName }: Props): React.JSX.Element {
   const outerRef = useRef<HTMLDivElement>(null);
   const pendingBlockRef = useRef<HTMLDivElement>(null);
   const speakerRef = useRef<HTMLSpanElement>(null);
@@ -154,7 +155,7 @@ export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false
         style={{ height: 0, overflow: "hidden", visibility: "hidden" }}
       >
         <span ref={speakerRef} className="font-sans font-semibold text-sm text-[#60594D]">
-          Speaker 1
+          {speakerName || "Speaker 1"}
         </span>
         <span ref={textRef} className="font-sans font-medium text-sm text-[#171717]">
           {(pendingPreview || textToShow).split("").map((char, i) => (
