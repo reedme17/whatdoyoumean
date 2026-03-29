@@ -23,6 +23,7 @@ import { RecapScreen } from "./components/RecapScreen.js";
 import { TextModeScreen } from "./components/TextModeScreen.js";
 import { ExpandPanel, type SessionSummary, type SttLanguage } from "./components/ExpandPanel.js";
 import { Onboarding } from "./components/Onboarding.js";
+import { DownloadPopover } from "./components/DownloadPopover.js";
 
 type Screen = "onboarding" | "home" | "live" | "recap" | "text" | "processing" ;
 
@@ -67,6 +68,7 @@ export function App(): React.JSX.Element {
   const [responseEnabled, setResponseEnabled] = useState(false);
 
   const [pendingPreview, setPendingPreview] = useState<string>("");
+  const [transcriptTexts, setTranscriptTexts] = useState<string[]>([]);
 
   // ── Text mode state ──
   const [textCards, setTextCards] = useState<CoreMeaningCard[]>([]);
@@ -76,6 +78,9 @@ export function App(): React.JSX.Element {
   // ── Expand panel ──
   const [panelOpen, setPanelOpen] = useState(false);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
+
+  // ── Per-group speaker name overrides from RecapScreen ──
+  const [groupOverrides, setGroupOverrides] = useState<Map<number, { speakerKey: string; name: string }>>(new Map());
 
   // ── WebSocket ──
   // ── WebSocket ──
@@ -112,7 +117,7 @@ export function App(): React.JSX.Element {
         const consolidated = (event as Extract<ServerEvent, { type: "cards:consolidated" }>).cards;
         const s = screenRef.current;
         if (s === "live" || s === "processing") {
-          console.log(`[App] Cards consolidated: ${consolidated.length} cards`);
+          console.log(`[App] Cards consolidated: ${consolidated.length} cards`, consolidated.map(c => `${c.content?.slice(0,15)} spk=${c.speakerId}`));
           setCards(consolidated);
         }
         break;
@@ -126,6 +131,24 @@ export function App(): React.JSX.Element {
           (event as Extract<ServerEvent, { type: "recommendation:new" }>).recommendations
         );
         break;
+
+      case "transcript:final": {
+        const seg = (event as any).segment;
+        if (seg?.text) setTranscriptTexts((prev) => [...prev, seg.text]);
+        // Track speaker from Deepgram diarization
+        if (seg?.speakerId && seg.speakerId !== "user") {
+          console.log(`[App] Speaker detected: ${seg.speakerId}`);
+          setSpeakers((prev) => {
+            if (prev.has(seg.speakerId)) return prev;
+            const next = new Map(prev);
+            const idx = next.size + 1;
+            next.set(seg.speakerId, `Speaker ${idx}`);
+            console.log(`[App] Speakers map now:`, [...next.entries()]);
+            return next;
+          });
+        }
+        break;
+      }
 
       case "pending:preview":
         setPendingPreview((event as Extract<ServerEvent, { type: "pending:preview" }>).text);
@@ -184,9 +207,11 @@ export function App(): React.JSX.Element {
     setBookmarks([]);
     setTextCards([]);
     setTextRecs([]);
+    setTranscriptTexts([]);
     setAnalyzing(false);
     setPendingPreview("");
     setSpeakerName("");
+    setSpeakers(new Map());
   };
 
   const handleStart = async () => {
@@ -282,6 +307,7 @@ export function App(): React.JSX.Element {
     setAnalyzing(true);
     setTextCards([]);
     setTextRecs([]);
+    setTranscriptTexts([text]);
 
     // Start a text-mode session first, then submit text
     send({ type: "session:start", config: { mode: "offline", sampleRate: 16000, channels: 1, noiseSuppression: false, autoGain: false, language: sttLanguage, responseEnabled } });
@@ -320,14 +346,96 @@ export function App(): React.JSX.Element {
 
   const handleExport = () => {
     const allCards = screen === "text" ? textCards : cards;
-    const md = [
-      "# Session Recap\n",
+    const allRecs = screen === "text" ? textRecs : recommendations;
+    const sections = [
+      "# WDYM - 啥意思\n",
       ...allCards.map((c) => `- **[${c.category}]** ${c.content}`),
       "",
-      "## Recommendations\n",
-      ...recommendations.map((r) => `- ${r.text}`),
-    ].join("\n");
-    navigator.clipboard.writeText(md);
+    ];
+    if (allRecs.length > 0) {
+      sections.push("## Recommendations\n", ...allRecs.map((r) => `- ${r.text}`), "");
+    }
+    if (transcriptTexts.length > 0) {
+      sections.push("## Original Transcript\n", transcriptTexts.join(" "), "");
+    }
+    navigator.clipboard.writeText(sections.join("\n"));
+  };
+
+  const handleExportMd = () => {
+    const allCards = screen === "text" ? textCards : cards;
+    const allRecs = screen === "text" ? textRecs : recommendations;
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10);
+    const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, "");
+
+    const sections: string[] = [
+      `# WDYM - 啥意思`,
+      `> ${dateStr} ${now.toTimeString().slice(0, 8)}\n`,
+    ];
+
+    // Analysis results — group cards by speaker runs (same as RecapScreen)
+    const isAudioMode = screen !== "text";
+    sections.push("## Analysis\n");
+
+    if (isAudioMode) {
+      // Build speaker runs for export
+      const exportGroups: { speakerKey: string; cards: typeof allCards }[] = [];
+      for (const c of allCards) {
+        const spkKey = c.speakerId ?? "";
+        const last = exportGroups[exportGroups.length - 1];
+        if (last && last.speakerKey === spkKey) {
+          last.cards.push(c);
+        } else {
+          exportGroups.push({ speakerKey: spkKey, cards: [c] });
+        }
+      }
+      for (let gi = 0; gi < exportGroups.length; gi++) {
+        const g = exportGroups[gi];
+        // Check per-group override first, then speakers Map, then default
+        const override = groupOverrides.get(gi);
+        const name = (override?.speakerKey === g.speakerKey ? override.name : null)
+          ?? speakers.get(g.speakerKey) ?? (speakerName || "Speaker 1");
+        sections.push(`### ${name}\n`);
+        for (const c of g.cards) {
+          const mark = c.isHighlighted ? " ⭐" : "";
+          sections.push(`- **${c.category}**${mark} — ${c.content}`);
+        }
+        sections.push("");
+      }
+    } else {
+      for (const c of allCards) {
+        const mark = c.isHighlighted ? " ⭐" : "";
+        sections.push(`- **${c.category}**${mark} — ${c.content}`);
+      }
+      sections.push("");
+    }
+
+    // Recommendations
+    if (allRecs.length > 0) {
+      sections.push("## Response Recommendations\n");
+      for (const r of allRecs) {
+        sections.push(`- ${r.text}`);
+      }
+      sections.push("");
+    }
+
+    // Original transcript
+    sections.push("## Original Transcript\n");
+    if (transcriptTexts.length > 0) {
+      sections.push(transcriptTexts.join(" "));
+    } else {
+      sections.push("_(No transcript recorded)_");
+    }
+    sections.push("");
+
+    const md = sections.join("\n");
+    const blob = new Blob([md], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `wdym-${dateStr}-${timeStr}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleEditCard = (cardId: string, content: string) => {
@@ -431,7 +539,16 @@ export function App(): React.JSX.Element {
           onStop={handleStop}
           onSpeakerRename={(name) => {
             setSpeakerName(name);
-            setSpeakers(new Map([["speaker_0", name]]));
+            // Update all known speaker entries with the custom name
+            setSpeakers((prev) => {
+              const next = new Map(prev);
+              for (const key of next.keys()) {
+                next.set(key, name);
+              }
+              // Also ensure speaker_0 is set (most common single-speaker case)
+              if (next.size === 0) next.set("speaker_0", name);
+              return next;
+            });
           }}
           speakerName={speakerName}
           pendingPreview={pendingPreview}
@@ -463,6 +580,15 @@ export function App(): React.JSX.Element {
           }}
           onEditCard={handleEditCard}
           speakerName={speakerName}
+          topRightContent={<DownloadPopover onCopy={handleExport} onExportMd={handleExportMd} />}
+          onSpeakerRename={(key, name) => {
+            setSpeakers((prev) => {
+              const next = new Map(prev);
+              next.set(key, name);
+              return next;
+            });
+          }}
+          onGroupOverridesChange={setGroupOverrides}
         />
         </div>
       )}
@@ -485,6 +611,7 @@ export function App(): React.JSX.Element {
           analyzing={analyzing}
           responseEnabled={responseEnabled}
           onResponseEnabledChange={setResponseEnabled}
+          onExportMd={handleExportMd}
         />
         </div>
       )}

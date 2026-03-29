@@ -16,9 +16,8 @@ export function RecommendationTokens({ recommendations }: Props): React.JSX.Elem
 
   if (valid.length === 0) {
     if (recommendations.length === 0) return null;
-    // Had recommendations but all empty
     return (
-      <div className="flex items-center gap-2 py-0 bg-background">
+      <div className="flex items-center gap-2 py-0 bg-background screen-enter">
         <CornerDownRightIcon size={14} className="text-[#93918E] shrink-0" />
         <span className="text-[10px] font-sans text-[#93918E]">No available response recommendation</span>
       </div>
@@ -29,7 +28,7 @@ export function RecommendationTokens({ recommendations }: Props): React.JSX.Elem
     <div
       role="region"
       aria-label="Recommendations"
-      className="flex items-center gap-2 py-0 bg-background"
+      className="flex items-center gap-2 py-0 bg-background screen-enter"
     >
       <CornerDownRightIcon size={14} className="text-[#93918E] shrink-0" />
       <div className="flex flex-wrap gap-1.5">

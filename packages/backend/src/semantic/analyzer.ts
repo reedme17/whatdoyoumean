@@ -239,6 +239,8 @@ export class SemanticAnalyzer {
 const SYSTEM_PROMPT = `You are a semantic analysis engine. Given a transcript segment and conversation context, extract the core meaning in a concise statement.
 
 CRITICAL: The "content" field MUST be in the SAME LANGUAGE as the transcript segment. If the input is Chinese, respond in Chinese. If English, respond in English. If mixed, use the dominant language.
+CRITICAL: Write content as a DIRECT summary of what was said — NOT in third person. Do NOT write "The speaker says..." or "The person thinks...". Instead, directly state the point: "Vanessa was more energetic before" not "The speaker says Vanessa was more energetic".
+CRITICAL: NEVER use these phrases: "The speaker", "The person", "Appreciation is expressed", "It is stated", "One believes". Write as if quoting the actual point made. WRONG: "The speaker is upset" → RIGHT: "I'm upset about this". WRONG: "Appreciation is expressed" → RIGHT: "Thank you so much".
 
 Respond ONLY with valid JSON in this exact format:
 {
@@ -257,12 +259,16 @@ const MULTI_SYSTEM_PROMPT = `You are a semantic analysis engine. Given a text pa
 CRITICAL: The "content" field MUST be in the SAME LANGUAGE as the input text.
 CRITICAL: Merge related clauses into ONE item. Do NOT split on commas or conjunctions. Each item should represent a complete, self-contained idea — not a sentence fragment.
 CRITICAL: Do NOT produce duplicate or near-duplicate items. If two clauses express the same idea, merge them into one.
+CRITICAL: Strip any speaker tags like [speaker_0], [speaker_1], [user] etc. from the output content. These are metadata — do NOT include them in the "content" field.
+CRITICAL: The ⭐IMPORTANT annotation is metadata indicating user-marked moments. Preserve the meaning of marked content but do NOT include ⭐IMPORTANT in the output.
 
 Respond ONLY with a valid JSON array. Each element has this format:
 {
   "content": "<core meaning in ≤30 English words or ≤50 Chinese characters>",
   "category": "<one of: fact, opinion, question, decision, action_item, proposal>"
 }
+
+CRITICAL: Write content as a DIRECT summary — NOT in third person. NEVER use "The speaker", "The person", "It is stated", "Appreciation is expressed", or any passive/third-person phrasing. State the point directly as said. WRONG: "The speaker is upset" → RIGHT: "I'm upset about this". WRONG: "Appreciation is expressed" → RIGHT: "Thank you so much". WRONG: "The speaker disagrees" → RIGHT: "I disagree with that".
 
 Example: [{"content":"The meeting is at 3pm","category":"fact"},{"content":"We should cancel the project","category":"opinion"}]
 
@@ -302,8 +308,6 @@ function buildAnalysisPrompt(
 "${segment.text}"
 
 ${langHint}
-
-Speaker: ${segment.speakerId}
 
 Existing cards:
 ${existingCards || "(none)"}

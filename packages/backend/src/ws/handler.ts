@@ -246,19 +246,46 @@ export function setupWebSocketHandlers(
         // Final consolidation: full transcript review with marks
         if (state.transcripts.length >= 2) {
           console.log("[WS] Final consolidation — reviewing all transcripts");
-          const fullText = state.transcripts
-            .map((t) => {
-              const isMarked = state.markedTexts.has(t.text);
-              return `[${t.speakerId}]${isMarked ? " ⭐IMPORTANT" : ""} ${t.text}`;
-            })
-            .join("\n");
 
-          const langResult = state.languageDetector.detectFromText(fullText);
-          const finalCards = await semanticAnalyzer.analyzeMulti(fullText, langResult.primaryLanguage);
+          // Group transcripts into sequential speaker runs (preserves time order)
+          const runs: { speakerId: string; segments: TranscriptSegment[] }[] = [];
+          for (const t of state.transcripts) {
+            const last = runs[runs.length - 1];
+            if (last && last.speakerId === t.speakerId) {
+              last.segments.push(t);
+            } else {
+              runs.push({ speakerId: t.speakerId, segments: [t] });
+            }
+          }
 
-          // Dedup
+          const allFinalCards: CoreMeaningCard[] = [];
+          let orderIdx = 0;
+
+          for (const run of runs) {
+            const runText = run.segments
+              .map((t) => {
+                const isMarked = state.markedTexts.has(t.text);
+                return `${isMarked ? "⭐IMPORTANT " : ""}${t.text}`;
+              })
+              .join("\n");
+
+            if (!runText.trim()) continue;
+
+            const langResult = state.languageDetector.detectFromText(runText);
+            const runCards = await semanticAnalyzer.analyzeMulti(runText, langResult.primaryLanguage);
+
+            for (const card of runCards) {
+              card.sessionId = state.sessionId!;
+              card.speakerId = run.speakerId;
+              // Use createdAt to preserve ordering
+              card.createdAt = new Date(Date.now() + orderIdx++);
+              allFinalCards.push(card);
+            }
+          }
+
+          // Dedup across all speakers
           const seenContents: string[] = [];
-          const dedupedFinal = finalCards.filter((card) => {
+          const dedupedFinal = allFinalCards.filter((card) => {
             const cardLower = card.content.toLowerCase();
             const cardWords = cardLower.split(/\s+/).filter(w => w.length > 2);
             for (const seen of seenContents) {
@@ -274,9 +301,6 @@ export function setupWebSocketHandlers(
 
           // Inherit highlights
           const hadHighlight = state.cards.some(c => c.isHighlighted);
-          for (const card of dedupedFinal) {
-            card.sessionId = state.sessionId!;
-          }
           if (hadHighlight && dedupedFinal.length > 0) {
             const highlightedContents = state.cards.filter(c => c.isHighlighted).map(c => c.content.toLowerCase());
             let bestIdx = 0;
@@ -296,10 +320,15 @@ export function setupWebSocketHandlers(
           }
 
           state.cards = dedupedFinal;
-          console.log(`[WS] Final consolidation complete — ${dedupedFinal.length} cards`);
+          console.log(`[WS] Final consolidation complete — ${dedupedFinal.length} cards from ${runs.length} speaker runs`);
+          for (const c of dedupedFinal) {
+            console.log(`[WS]   card: "${c.content.slice(0, 30)}" speaker=${c.speakerId}`);
+          }
           emitServerEvent(socket, { type: "cards:consolidated", cards: dedupedFinal });
         }
 
+        // Invalidate any in-flight window consolidations
+        state.consolidationVersion++;
         sessionManager.end(state.sessionId);
         state.transcriptionEngine.stopTranscription();
         emitServerEvent(socket, { type: "session:state", state: "ended" });
@@ -613,12 +642,23 @@ async function finalizePendingText(
   console.log(`[WS] Silence detected — finalizing ${text.length} chars into card`);
 
   // Create a merged segment representing the full utterance
+  // Use the most common speaker from pending segments
+  const speakerCounts = new Map<string, number>();
+  for (const s of segments) {
+    speakerCounts.set(s.speakerId, (speakerCounts.get(s.speakerId) ?? 0) + 1);
+  }
+  let dominantSpeaker = segments[0]?.speakerId ?? "user";
+  let maxCount = 0;
+  for (const [spk, cnt] of speakerCounts) {
+    if (cnt > maxCount) { maxCount = cnt; dominantSpeaker = spk; }
+  }
+
   const mergedSegment: TranscriptSegment = {
     id: `merged_${Date.now()}`,
     sessionId: state.sessionId!,
     text,
     languageCode: segments[0]?.languageCode ?? "en",
-    speakerId: "user",
+    speakerId: dominantSpeaker,
     startTime: segments[0]?.startTime ?? Date.now(),
     endTime: segments[segments.length - 1]?.endTime ?? Date.now(),
     isFinal: true,
@@ -653,9 +693,10 @@ async function processFinalTranscript(
     // Semantic analysis → card
     console.log("[WS] Calling analyzer.analyze()...");
     const card = await analyzer.analyze(segment, context);
-    console.log("[WS] Card created:", card.content.slice(0, 50));
+    console.log("[WS] Card created:", card.content.slice(0, 50), "speaker:", segment.speakerId);
     const format = visualizer.selectFormat(card);
     card.visualizationFormat = format;
+    card.speakerId = segment.speakerId;
     state.cards.push(card);
     emitServerEvent(socket, { type: "card:created", card });
 
@@ -735,23 +776,47 @@ async function runConsolidation(
   state.consolidationInFlight = true;
   const version = ++state.consolidationVersion;
 
-  // Build text from window transcripts only, marking highlighted ones with ⭐
-  const windowText = windowTranscripts
-    .map((t) => {
-      const isMarked = state.markedTexts.has(t.text);
-      return `[${t.speakerId}]${isMarked ? " ⭐IMPORTANT" : ""} ${t.text}`;
-    })
-    .join("\n");
+  // Group window transcripts into sequential speaker runs (preserves time order)
+  const runs: { speakerId: string; segments: TranscriptSegment[] }[] = [];
+  for (const t of windowTranscripts) {
+    const last = runs[runs.length - 1];
+    if (last && last.speakerId === t.speakerId) {
+      last.segments.push(t);
+    } else {
+      runs.push({ speakerId: t.speakerId, segments: [t] });
+    }
+  }
 
-  // Check if any window transcripts are marked
-  const hasMarkedContent = windowTranscripts.some((t) => state.markedTexts.has(t.text));
+  const langResult = state.languageDetector.detectFromText(
+    windowTranscripts.map(t => t.text).join(" ")
+  );
 
-  const langResult = state.languageDetector.detectFromText(windowText);
-
-  console.log(`[WS] Consolidation v${version} starting — window [${state.windowStartIndex}..${totalTranscripts}], ${windowText.length} chars, ${state.lockedCards.length} locked cards`);
+  console.log(`[WS] Consolidation v${version} starting — window [${state.windowStartIndex}..${totalTranscripts}], ${runs.length} speaker runs, ${state.lockedCards.length} locked cards`);
 
   try {
-    const windowCards = await analyzer.analyzeMulti(windowText, langResult.primaryLanguage);
+    const allNewCards: CoreMeaningCard[] = [];
+    let orderIdx = 0;
+
+    // Consolidate each sequential speaker run separately
+    for (const run of runs) {
+      const runText = run.segments
+        .map((t) => {
+          const isMarked = state.markedTexts.has(t.text);
+          return `${isMarked ? "⭐IMPORTANT " : ""}${t.text}`;
+        })
+        .join("\n");
+
+      if (!runText.trim()) continue;
+
+      const runCards = await analyzer.analyzeMulti(runText, langResult.primaryLanguage);
+      for (const card of runCards) {
+        card.speakerId = run.speakerId;
+        card.createdAt = new Date(Date.now() + orderIdx++);
+        allNewCards.push(card);
+      }
+    }
+
+    const windowCards = allNewCards;
 
     // Check if this consolidation is still current
     if (version !== state.consolidationVersion) {
@@ -781,6 +846,16 @@ async function runConsolidation(
 
     for (const card of dedupedCards) {
       card.sessionId = state.sessionId!;
+      // Match card content to window transcripts to inherit speaker
+      const cardWords = card.content.toLowerCase().split(/\s+/).filter(w => w.length > 1);
+      let bestSpeaker = "speaker_0";
+      let bestScore = -1;
+      for (const t of windowTranscripts) {
+        const tWords = t.text.toLowerCase().split(/\s+/).filter(w => w.length > 1);
+        const overlap = cardWords.filter(w => tWords.some(tw => tw.includes(w) || w.includes(tw))).length;
+        if (overlap > bestScore) { bestScore = overlap; bestSpeaker = t.speakerId; }
+      }
+      card.speakerId = bestSpeaker;
     }
 
     // Inherit highlight: if any old card was highlighted, mark the best-matching new card
@@ -831,6 +906,18 @@ function handleStreamingResult(
   visualizer: VisualizationEngine,
 ): void {
   if (result.isFinal) {
+    const newSpeakerId = `speaker_${result.speaker}`;
+
+    // Speaker change detection: if pending text belongs to a different speaker, finalize it first
+    if (state.pendingText.trim() && state.pendingSegments.length > 0) {
+      const prevSpeaker = state.pendingSegments[state.pendingSegments.length - 1].speakerId;
+      if (prevSpeaker !== newSpeakerId) {
+        console.log(`[WS] Speaker change: ${prevSpeaker} → ${newSpeakerId} — finalizing pending`);
+        if (state.silenceTimer) { clearTimeout(state.silenceTimer); state.silenceTimer = null; }
+        finalizePendingText(socket, state, analyzer, recommender, visualizer);
+      }
+    }
+
     // Final result — accumulate into pendingText
     state.pendingText += (state.pendingText ? " " : "") + result.text.trim();
     state.interimText = "";
@@ -841,7 +928,7 @@ function handleStreamingResult(
       sessionId: state.sessionId!,
       text: result.text,
       languageCode: langResult.primaryLanguage,
-      speakerId: `speaker_${result.speaker}`,
+      speakerId: newSpeakerId,
       startTime: Date.now(),
       endTime: Date.now(),
       isFinal: true,
@@ -871,7 +958,7 @@ function handleStreamingResult(
       finalizePendingText(socket, state, analyzer, recommender, visualizer);
     }, SILENCE_THRESHOLD_MS);
 
-    console.log(`[WS] Stream final: "${result.text.slice(0, 60)}" (pending: ${state.pendingText.length} chars)`);
+    console.log(`[WS] Stream final: "${result.text.slice(0, 60)}" speaker=${result.speaker} (pending: ${state.pendingText.length} chars)`);
   } else {
     // Interim result — show as preview but don't accumulate
     state.interimText = result.text;

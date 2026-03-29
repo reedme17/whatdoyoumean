@@ -8,6 +8,8 @@ import type { CoreMeaningCard, Recommendation } from "@wdym/shared";
 import { RecapScreen } from "./RecapScreen.js";
 import { Button } from "./ui/button.js";
 import { XIcon } from "./ui/x-icon.js";
+import { FeatherIcon } from "./ui/feather-icon.js";
+import { DownloadPopover } from "./DownloadPopover.js";
 import { SlidersHorizontalIcon } from "./ui/sliders-icon.js";
 import { Popover, PopoverTrigger, PopoverContent } from "./ui/popover.js";
 import { Tabs, TabsList, TabsTrigger } from "./ui/tabs.js";
@@ -19,6 +21,7 @@ interface Props {
   cards: CoreMeaningCard[];
   recommendations: Recommendation[];
   analyzing: boolean;
+  onExportMd?: () => void;
   responseEnabled?: boolean;
   onResponseEnabledChange?: (v: boolean) => void;
 }
@@ -31,6 +34,7 @@ export function TextModeScreen({
   recommendations,
   analyzing,
   responseEnabled = false,
+  onExportMd,
   onResponseEnabledChange,
 }: Props): React.JSX.Element {
   const [text, setText] = useState("");
@@ -54,10 +58,16 @@ export function TextModeScreen({
           onReset?.();
         }}
         onEditCard={() => {}}
-        title="Results"
+        title="Result"
         actionLabel="Analyze another"
         showSpeakers={false}
         responseEnabled={responseEnabled}
+        topRightContent={
+          <div className="flex items-center gap-4">
+            <button className="text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0" onClick={() => onReset?.()} title="Edit"><FeatherIcon size={18} /></button>
+            <DownloadPopover onCopy={() => { const md = cards.map((c) => `- **[${c.category}]** ${c.content}`).join("\n"); navigator.clipboard.writeText(md); }} onExportMd={() => onExportMd?.()} />
+          </div>
+        }
         onResponseEnabledChange={onResponseEnabledChange}
       />
     );
@@ -65,9 +75,16 @@ export function TextModeScreen({
 
   return (
     <div className="flex flex-col h-full bg-background screen-enter" role="main" aria-label="Text analysis mode">
-      {/* Title */}
-      <div className="pl-[20px] pt-[12px] shrink-0">
+      {/* Title + Analyze button */}
+      <div className="flex items-baseline justify-between px-[20px] pt-[12px] shrink-0">
         <h1 className="font-serif font-normal text-[20px] text-[#60594D]">Analyze text</h1>
+        <Button
+          variant="normal"
+          onClick={() => text.trim() && onAnalyze(text)}
+          disabled={!text.trim() || analyzing}
+        >
+          {analyzing ? "Analyzing..." : "Analyze"}
+        </Button>
       </div>
 
       {/* Content area */}
@@ -83,15 +100,8 @@ export function TextModeScreen({
       </div>
 
       {/* Bottom bar */}
-      <div className="flex items-center justify-center px-[20px] pt-[12px] pb-[20px] shrink-0 relative">
-        <Button
-          variant="normal"
-          onClick={() => text.trim() && onAnalyze(text)}
-          disabled={!text.trim() || analyzing}
-        >
-          {analyzing ? "Analyzing..." : "Analyze"}
-        </Button>
-        <div className="absolute right-[20px] flex items-center gap-3">
+      <div className="flex items-center justify-end px-[20px] pt-[12px] pb-[20px] shrink-0">
+        <div className="flex items-center gap-4">
           <Popover>
             <PopoverTrigger asChild>
               <button className="text-[#93918E] hover:text-[#60594D] transition-colors cursor-pointer bg-transparent border-none p-0">

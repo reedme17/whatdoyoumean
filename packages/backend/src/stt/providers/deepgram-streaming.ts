@@ -86,8 +86,14 @@ export class DeepgramStreamingProvider {
           if (!alt) return;
           const text = alt.transcript ?? "";
           const confidence = alt.confidence ?? 0;
-          const speaker = alt.words?.[0]?.speaker ?? 0;
           const isFinal = msg.is_final === true;
+          // Collect all unique speakers from words array
+          const words = alt.words ?? [];
+          const speakerSet = new Set(words.map((w: { speaker?: number }) => w.speaker).filter((s: number | undefined) => s !== undefined));
+          const speaker = words[0]?.speaker ?? 0;
+          if (isFinal && text.trim()) {
+            console.log(`[DeepgramStream] Result: final=${isFinal} speaker=${speaker} speakers=[${[...speakerSet]}] words=${words.length} text="${text.slice(0, 40)}"`);
+          }
           if (text.trim()) {
             this.onResult?.({ text, isFinal, speaker, confidence });
           }

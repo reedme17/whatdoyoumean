@@ -163,8 +163,7 @@ export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false
         className="flex flex-col gap-[4px]"
         style={{ height: 0, overflow: "hidden", visibility: "hidden" }}
       >
-        <span ref={speakerRef} className="font-sans font-semibold text-sm text-[#60594D]">
-          {speakerName || "Speaker 1"}
+        <span ref={speakerRef} className="font-sans font-semibold text-sm text-[#60594D]" style={{ display: "none" }}>
         </span>
         <span ref={textRef} className="font-sans font-medium text-sm text-[#171717]">
           {(pendingPreview || textToShow).split("").map((char, i) => (

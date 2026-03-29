@@ -8,7 +8,7 @@ import type { CoreMeaningCard as CardType, MeaningCategory } from "@wdym/shared"
 import { Input } from "./ui/input.js";
 import { Button } from "./ui/button.js";
 
-const categoryLabels: Record<MeaningCategory, string> = {
+export const categoryLabels: Record<MeaningCategory, string> = {
   fact: "Fact",
   opinion: "Opinion",
   question: "Question",
@@ -25,6 +25,7 @@ interface Props {
   onEdit?: (cardId: string, content: string) => void;
   animateHighlight?: boolean;
   highlightIndex?: number;
+  badgeWidth?: number;
 }
 
 export function CoreMeaningCardView({
@@ -33,6 +34,7 @@ export function CoreMeaningCardView({
   onEdit,
   animateHighlight = false,
   highlightIndex = 0,
+  badgeWidth,
 }: Props): React.JSX.Element {
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(card.content);
@@ -48,7 +50,10 @@ export function CoreMeaningCardView({
       style={{ animation: "fadeInUp 0.3s ease-out" }}
     >
       {/* Category — italic 11px */}
-      <span className="font-sans italic text-[11px] whitespace-nowrap shrink-0 inline-block w-[48px]">
+      <span
+        className="font-sans italic text-[11px] whitespace-nowrap shrink-0 inline-block"
+        style={badgeWidth ? { width: badgeWidth } : { width: 48 }}
+      >
         {categoryLabels[card.category]}
       </span>
 
@@ -77,4 +82,26 @@ export function CoreMeaningCardView({
       )}
     </div>
   );
+}
+
+/** Compute badge width (px) based on the longest label among given cards */
+export function computeBadgeWidth(cards: CardType[]): number {
+  // Approximate widths in px at italic 11px (measured)
+  const labelWidths: Record<string, number> = {
+    "Fact": 22,
+    "Opinion": 38,
+    "Question": 44,
+    "Decision": 44,
+    "To do": 26,
+    "Proposal": 44,
+  };
+  let maxW = 0;
+  const seen = new Set<string>();
+  for (const c of cards) {
+    const label = categoryLabels[c.category];
+    if (seen.has(label)) continue;
+    seen.add(label);
+    maxW = Math.max(maxW, labelWidths[label] ?? 40);
+  }
+  return maxW || 22;
 }

@@ -35,6 +35,7 @@ interface Props {
 export function LiveSession({
   cards,
   recommendations,
+  speakers,
   isCapturing = false,
   audioError = null,
   analyser = null,
@@ -76,52 +77,40 @@ export function LiveSession({
         aria-live="polite"
         aria-label="Conversation flow"
         className="flex-1 flex flex-col justify-start overflow-y-auto px-[20px]"
-        style={{ maskImage: "linear-gradient(to bottom, black calc(100% - 32px), transparent 100%)", WebkitMaskImage: "linear-gradient(to bottom, black calc(100% - 32px), transparent 100%)" }}
+        style={{ maskImage: "linear-gradient(to bottom, black calc(100% - 16px), transparent 100%)", WebkitMaskImage: "linear-gradient(to bottom, black calc(100% - 16px), transparent 100%)" }}
       >
         <div className="flex flex-col gap-[10px]">
-          {cards.length > 0 && (
-            <div className="flex flex-col gap-[10px] px-[20px] py-[12px]">
-              <div className="flex items-baseline gap-[10px]">
-                <span className="font-sans font-semibold text-sm text-[#60594D]">{speakerName || "Speaker 1"}</span>
-                <Popover open={namePopoverOpen} onOpenChange={setNamePopoverOpen}>
-                  <PopoverTrigger asChild>
-                    <Button variant="small" className="leading-[20px]">{speakerName ? "Edit" : "Add name"}</Button>
-                  </PopoverTrigger>
-                  <PopoverContent side="right" align="start" className="w-[200px] p-3">
-                    <div className="flex flex-col gap-2">
-                      <input
-                        className="w-full px-2 py-1 text-xs font-sans border border-border rounded-md bg-transparent text-foreground outline-none focus:border-[#60594D] focus:ring-[0.5px] focus:ring-[#60594D] caret-[#60594D]"
-                        placeholder="Enter name..."
-                        value={nameInput}
-                        onChange={(e) => setNameInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && nameInput.trim()) {
-                            onSpeakerRename?.(nameInput.trim());
-                            setNamePopoverOpen(false);
-                          }
-                        }}
-                        autoFocus
-                      />
-                      <div className="flex justify-end gap-2">
-                        <button className="text-[10px] font-sans text-[#93918E] hover:text-foreground cursor-pointer bg-transparent border-none" onClick={() => setNamePopoverOpen(false)}>Cancel</button>
-                        <button className="text-[10px] font-sans font-medium text-[#5B5449] hover:text-foreground cursor-pointer bg-transparent border-none" onClick={() => { if (nameInput.trim()) { onSpeakerRename?.(nameInput.trim()); setNamePopoverOpen(false); } }}>Save</button>
-                      </div>
-                    </div>
-                  </PopoverContent>
-                </Popover>
+          {(() => {
+            // Group cards into sequential speaker runs (same logic as RecapScreen)
+            const groups: { speakerKey: string; speaker: string; cards: CoreMeaningCard[] }[] = [];
+            for (const card of cards) {
+              const speakerKey = card.speakerId ?? "";
+              const speaker = speakers.get(speakerKey) ?? speakerName ?? "Speaker 1";
+              const last = groups[groups.length - 1];
+              if (last && last.speakerKey === speakerKey) {
+                last.cards.push(card);
+              } else {
+                groups.push({ speakerKey, speaker, cards: [card] });
+              }
+            }
+            return groups.map((group, gi) => (
+              <div key={gi} className="flex flex-col gap-[10px] px-[20px] py-[12px]">
+                <span className="font-sans font-semibold text-sm text-[#60594D]">{group.speaker}</span>
+                <div className="flex flex-col gap-[8px]">
+                  {group.cards.map((card, i) => (
+                    <React.Fragment key={card.id}>
+                      {i > 0 && <div className="w-full h-px bg-border" />}
+                      <CoreMeaningCardView card={card} />
+                    </React.Fragment>
+                  ))}
+                </div>
               </div>
-              <div className="flex flex-col gap-[8px]">
-                {cards.map((card, i) => (
-                  <React.Fragment key={card.id}>
-                    {i > 0 && <div className="w-full h-px bg-border" />}
-                    <CoreMeaningCardView card={card} />
-                  </React.Fragment>
-                ))}
-              </div>
-              {/* Recommendations below last card, aligned with badge column */}
-              {responseEnabled && recommendations.length > 0 && (
-                <RecommendationTokens recommendations={recommendations} />
-              )}
+            ));
+          })()}
+          {/* Recommendations below last card */}
+          {responseEnabled && recommendations.length > 0 && cards.length > 0 && (
+            <div className="px-[20px]">
+              <RecommendationTokens recommendations={recommendations} />
             </div>
           )}
         </div>

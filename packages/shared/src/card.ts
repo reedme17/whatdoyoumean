@@ -23,6 +23,8 @@ export interface CoreMeaningCard {
   topicId: string;
   visualizationFormat: VisualizationFormat;
   isHighlighted: boolean;
+  /** Speaker ID from diarization (e.g. "speaker_0") */
+  speakerId?: string;
   createdAt: Date;
   updatedAt: Date;
 }
