@@ -36,7 +36,7 @@ export function SettingsControls({
           <div className="flex flex-col gap-1">
             <span className="text-[10px] font-sans font-medium text-[#60594D]">Language</span>
             <Tabs value={sttLanguage === "zh" ? "cn" : sttLanguage === "en" ? "en" : "multi"} onValueChange={(v) => onSttLanguageChange?.(v === "cn" ? "zh" : v === "en" ? "en" : "zh+en")}>
-              <TabsList><TabsTrigger value="multi">Multi</TabsTrigger><TabsTrigger value="cn">中文</TabsTrigger><TabsTrigger value="en">EN</TabsTrigger></TabsList>
+              <TabsList><TabsTrigger value="en">EN</TabsTrigger><TabsTrigger value="cn">中文</TabsTrigger><TabsTrigger value="multi">Multi</TabsTrigger></TabsList>
             </Tabs>
           </div>
           <div className="flex flex-col gap-1">
