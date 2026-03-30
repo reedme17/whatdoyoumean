@@ -16,16 +16,83 @@ import { SettingsControls } from "./SettingsControls.js";
 // Sequence: 0→1→2→3→pause(3s)→2→1→0→pause(3s), 0.5s per step
 const DOT_SEQUENCE = [0, 1, 2, 3, 3, 3, 3, 3, 3, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0];
 
-function ListeningDots(): React.JSX.Element {
+function formatDuration(ms: number): string {
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const mm = String(m).padStart(2, "0");
+  const ss = String(s).padStart(2, "0");
+  if (h > 0) return `${h}:${mm}:${ss}`;
+  return `${m}:${ss}`;
+}
+
+function ListeningDots({ sessionStartTime }: { sessionStartTime?: number }): React.JSX.Element {
   const [idx, setIdx] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  const [hovered, setHovered] = useState(false);
+  const [autoShow, setAutoShow] = useState(true);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [visible, setVisible] = useState(true); // controls the actual opacity transition
+
   useEffect(() => {
     const id = setInterval(() => setIdx((i) => (i + 1) % DOT_SEQUENCE.length), 500);
     return () => clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    if (!sessionStartTime) return;
+    const id = setInterval(() => setElapsed(Date.now() - sessionStartTime), 1000);
+    setElapsed(Date.now() - sessionStartTime);
+    return () => clearInterval(id);
+  }, [sessionStartTime]);
+
+  // Auto-show for first 5 seconds
+  useEffect(() => {
+    setAutoShow(true);
+    setVisible(true);
+    const t = setTimeout(() => {
+      setAutoShow(false);
+      setVisible(false);
+    }, 5000);
+    return () => clearTimeout(t);
+  }, []);
+
+  const handleMouseEnter = () => {
+    setHovered(true);
+    setVisible(true);
+    if (hideTimerRef.current) { clearTimeout(hideTimerRef.current); hideTimerRef.current = null; }
+  };
+
+  const handleMouseLeave = () => {
+    setHovered(false);
+    hideTimerRef.current = setTimeout(() => setVisible(false), 3000);
+  };
+
+  // Cleanup timer on unmount
+  useEffect(() => () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current); }, []);
+
   const dots = ".".repeat(DOT_SEQUENCE[idx]);
+  const showDuration = visible || autoShow;
+  const durationText = formatDuration(elapsed);
+
   return (
-    <span className="font-sans font-medium text-sm text-[#93918E] whitespace-nowrap" style={{ minWidth: 80 }}>
+    <span
+      className="font-sans font-medium text-sm text-[#93918E] whitespace-nowrap cursor-default"
+      style={{ minWidth: 80 }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
       Listening{dots}
+      <span
+        style={{
+          opacity: showDuration ? 1 : 0,
+          transition: "opacity 0.5s ease",
+          marginLeft: 6,
+        }}
+      >
+        ({durationText})
+      </span>
     </span>
   );
 }
@@ -43,10 +110,11 @@ interface Props {
   onResponseEnabledChange?: (v: boolean) => void;
   audioSource?: AudioSourceMode;
   onAudioSourceChange?: (source: AudioSourceMode) => void;
+  sessionStartTime?: number;
   speakerName?: string;
 }
 
-export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false, pendingPreview = "", pendingTextRef, sttLanguage = "zh+en", onSttLanguageChange, responseEnabled = false, onResponseEnabledChange, audioSource = "mic", onAudioSourceChange, speakerName }: Props): React.JSX.Element {
+export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false, pendingPreview = "", pendingTextRef, sttLanguage = "zh+en", onSttLanguageChange, responseEnabled = false, onResponseEnabledChange, audioSource = "mic", onAudioSourceChange, sessionStartTime, speakerName }: Props): React.JSX.Element {
   const outerRef = useRef<HTMLDivElement>(null);
   const pendingBlockRef = useRef<HTMLDivElement>(null);
   const [showMarked, setShowMarked] = useState(false);
@@ -185,7 +253,7 @@ export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false
       {/* Controls row */}
       <div className="flex items-center justify-between w-full">
         <div className="flex-1 min-w-0 flex items-center gap-2">
-          <ListeningDots />
+          <ListeningDots sessionStartTime={sessionStartTime} />
         </div>
 
         <div className="relative shrink-0">

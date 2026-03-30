@@ -615,12 +615,19 @@ export function App(): React.JSX.Element {
           onResponseEnabledChange={setResponseEnabled}
           audioSource={audioSource}
           onAudioSourceChange={setAudioSource}
+          sessionStartTime={sessionStartRef.current}
         />
       )}
 
       {screen === "processing" && (
         <div key="processing" className="screen-enter flex flex-col items-center justify-center h-full bg-background text-foreground gap-4">
-          <span className="font-sans text-sm text-[#93918E]">{processingStage || "Wrapping up..."}</span>
+          <span
+            key={processingStage}
+            className="font-sans text-sm text-[#93918E]"
+            style={{ animation: "stageFadeIn 0.5s ease-out" }}
+          >
+            {processingStage || "Wrapping up..."}
+          </span>
         </div>
       )}
 

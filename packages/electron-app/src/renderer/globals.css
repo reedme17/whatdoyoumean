@@ -99,6 +99,11 @@ button, a, input, textarea, select, [role="button"] {
   animation: screenFadeIn 0.3s ease-out both;
 }
 
+@keyframes stageFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 @keyframes fadeOut {
   from { opacity: 1; }
   to { opacity: 0; }

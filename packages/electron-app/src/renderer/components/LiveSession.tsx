@@ -34,6 +34,7 @@ interface Props {
   onResponseEnabledChange?: (v: boolean) => void;
   audioSource?: AudioSourceMode;
   onAudioSourceChange?: (source: AudioSourceMode) => void;
+  sessionStartTime?: number;
 }
 
 export function LiveSession({
@@ -54,6 +55,7 @@ export function LiveSession({
   onResponseEnabledChange,
   audioSource,
   onAudioSourceChange,
+  sessionStartTime,
 }: Props): React.JSX.Element {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
@@ -156,6 +158,7 @@ export function LiveSession({
         onResponseEnabledChange={onResponseEnabledChange}
         audioSource={audioSource}
         onAudioSourceChange={onAudioSourceChange}
+        sessionStartTime={sessionStartTime}
         speakerName={speakerName}
       />
     </div>
