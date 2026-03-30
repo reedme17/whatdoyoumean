@@ -44,8 +44,10 @@ const DrawerContent = React.forwardRef<
         "inset-y-0 right-0 w-72 border-l rounded-l-[16px]",
         className
       )}
+      aria-describedby={undefined}
       {...props}
     >
+      <DrawerPrimitive.Title className="sr-only">Menu</DrawerPrimitive.Title>
       {children}
     </DrawerPrimitive.Content>
   </DrawerPortal>

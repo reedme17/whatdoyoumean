@@ -265,7 +265,7 @@ export function ExpandPanel({
                   </div>
                 </div>
               )}
-              <div className="flex items-center justify-end px-[20px] py-[12px] shrink-0">
+              <div className="flex items-center justify-end px-[20px] py-[20px] shrink-0">
                 <button className="text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none" onClick={handleClose} aria-label="Close history"><XIcon size={20} /></button>
               </div>
             </div>
