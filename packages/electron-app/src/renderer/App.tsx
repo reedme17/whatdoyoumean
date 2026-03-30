@@ -624,7 +624,7 @@ export function App(): React.JSX.Element {
           <span
             key={processingStage}
             className="font-sans text-sm text-[#93918E]"
-            style={{ animation: "stageFadeIn 0.5s ease-out" }}
+            style={{ animation: "stageFadeIn 0.8s ease-out" }}
           >
             {processingStage || "Wrapping up..."}
           </span>

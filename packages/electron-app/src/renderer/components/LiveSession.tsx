@@ -59,6 +59,7 @@ export function LiveSession({
 }: Props): React.JSX.Element {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
+  const [ending, setEnding] = useState(false);
   const pendingTextRef = useRef<HTMLDivElement>(null);
   const [nameInput, setNameInput] = useState("");
   const [namePopoverOpen, setNamePopoverOpen] = useState(false);
@@ -141,13 +142,16 @@ export function LiveSession({
       )}
 
       {/* Full-width waveform above bottom bar */}
+      {!ending && (
       <div className="w-full px-[20px] shrink-0">
         <Waveform analyser={analyser} isCapturing={isCapturing} width={600} height={60} barCount={40} color="#F0EDE8" idleColor="#E8E4DE" mode="wave" />
       </div>
+      )}
 
       <BottomBar
         onFlag={onFlag}
         onStop={onStop}
+        onEndStart={() => setEnding(true)}
         analyser={analyser}
         isCapturing={isCapturing}
         pendingPreview={pendingPreview}

@@ -24,7 +24,7 @@ function formatDuration(ms: number): string {
   const mm = String(m).padStart(2, "0");
   const ss = String(s).padStart(2, "0");
   if (h > 0) return `${h}:${mm}:${ss}`;
-  return `${m}:${ss}`;
+  return `${mm}:${ss}`;
 }
 
 function ListeningDots({ sessionStartTime }: { sessionStartTime?: number }): React.JSX.Element {
@@ -78,17 +78,17 @@ function ListeningDots({ sessionStartTime }: { sessionStartTime?: number }): Rea
 
   return (
     <span
-      className="font-sans font-medium text-sm text-[#93918E] whitespace-nowrap cursor-default"
+      className="font-sans font-semibold text-sm text-[#93918E] whitespace-nowrap cursor-default"
       style={{ minWidth: 80 }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      Listening{dots}
+      Listening<span style={{ display: "inline-block", width: "1.2em", textAlign: "left" }}>{dots}</span>
       <span
         style={{
           opacity: showDuration ? 1 : 0,
           transition: "opacity 0.5s ease",
-          marginLeft: 6,
+          marginLeft: 2,
         }}
       >
         ({durationText})
@@ -111,10 +111,11 @@ interface Props {
   audioSource?: AudioSourceMode;
   onAudioSourceChange?: (source: AudioSourceMode) => void;
   sessionStartTime?: number;
+  onEndStart?: () => void;
   speakerName?: string;
 }
 
-export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false, pendingPreview = "", pendingTextRef, sttLanguage = "zh+en", onSttLanguageChange, responseEnabled = false, onResponseEnabledChange, audioSource = "mic", onAudioSourceChange, sessionStartTime, speakerName }: Props): React.JSX.Element {
+export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false, pendingPreview = "", pendingTextRef, sttLanguage = "zh+en", onSttLanguageChange, responseEnabled = false, onResponseEnabledChange, audioSource = "mic", onAudioSourceChange, sessionStartTime, onEndStart, speakerName }: Props): React.JSX.Element {
   const outerRef = useRef<HTMLDivElement>(null);
   const pendingBlockRef = useRef<HTMLDivElement>(null);
   const [showMarked, setShowMarked] = useState(false);
@@ -264,7 +265,7 @@ export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false
           )}
           <button
             className="text-[#93918E] hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0"
-            style={{ transform: "translateY(2px)" }}
+            style={{ transform: "translateY(3px)" }}
             onClick={() => {
               onFlag();
               setShowMarked(true);
@@ -301,8 +302,8 @@ export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false
             </PopoverContent>
           </Popover>
           <button
-            className="flex items-center gap-[6px] text-sm font-sans font-medium text-[#93918E] hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0 group"
-            onClick={onStop}
+            className="flex items-center gap-[6px] text-sm font-sans font-semibold text-[#93918E] hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0 group"
+            onClick={() => { onEndStart?.(); if (outerRef.current) { gsap.to(outerRef.current, { y: 300, opacity: 0, duration: 0.5, ease: "power2.in", onComplete: onStop }); } else { onStop(); } }}
             title="Stop session (⌘⇧S)"
             aria-label="Stop session"
           >
