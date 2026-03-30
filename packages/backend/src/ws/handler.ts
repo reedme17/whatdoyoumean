@@ -71,6 +71,8 @@ interface SocketSessionState {
   windowPassCount: number;
   /** Consolidation: is a consolidation currently in flight */
   consolidationInFlight: boolean;
+  /** Flag: next card created should be highlighted (set by bookmark during pending) */
+  markNextCard: boolean;
 }
 
 /**
@@ -126,6 +128,7 @@ export function setupWebSocketHandlers(
       windowStartIndex: 0,
       windowPassCount: 0,
       consolidationInFlight: false,
+      markNextCard: false,
     };
 
     // Wire transcription engine callbacks
@@ -452,7 +455,7 @@ export function setupWebSocketHandlers(
       }
     });
 
-    socket.on("bookmark:create", (data: Extract<ClientEvent, { type: "bookmark:create" }>) => {
+    socket.on("bookmark:create", async (data: Extract<ClientEvent, { type: "bookmark:create" }>) => {
       try {
         if (!state.sessionId) throw new Error("No active session");
         bookmarkService.create({
@@ -467,14 +470,21 @@ export function setupWebSocketHandlers(
           state.markedTexts.add(lastTranscript.text);
           console.log("[WS] Marked transcript text:", lastTranscript.text.slice(0, 50));
         }
-        // Also mark pending text if any
+        // If there's pending text, force-finalize it into a card first so the mark lands on it
         if (state.pendingText.trim()) {
           state.markedTexts.add(state.pendingText.trim());
-        }
-        // Highlight the most recent card on backend too
-        if (state.cards.length > 0) {
-          state.cards[state.cards.length - 1].isHighlighted = true;
-          console.log("[WS] Highlighted card:", state.cards[state.cards.length - 1].content.slice(0, 50));
+          state.markNextCard = true;
+          if (state.silenceTimer) { clearTimeout(state.silenceTimer); state.silenceTimer = null; }
+          console.log("[WS] Mark during pending — force finalizing");
+          await finalizePendingText(socket, state, semanticAnalyzer, recommendationEngine, visualizationEngine);
+          // markNextCard flag handled in processFinalTranscript
+        } else {
+          // No pending text — highlight the most recent existing card
+          if (state.cards.length > 0) {
+            state.cards[state.cards.length - 1].isHighlighted = true;
+            console.log("[WS] Highlighted card:", state.cards[state.cards.length - 1].content.slice(0, 50));
+            emitServerEvent(socket, { type: "card:updated", card: state.cards[state.cards.length - 1] });
+          }
         }
       } catch (err) {
         emitError(socket, "bookmark", String(err), true);
@@ -697,6 +707,12 @@ async function processFinalTranscript(
     const format = visualizer.selectFormat(card);
     card.visualizationFormat = format;
     card.speakerId = segment.speakerId;
+    // Check if this card should be auto-highlighted (mark during pending text)
+    if (state.markNextCard) {
+      card.isHighlighted = true;
+      state.markNextCard = false;
+      console.log("[WS] Auto-highlighted card from pending mark:", card.content.slice(0, 50));
+    }
     state.cards.push(card);
     emitServerEvent(socket, { type: "card:created", card });
 

@@ -157,6 +157,25 @@ button, a, input, textarea, select, [role="button"] {
   to { background-size: 100% 100%; }
 }
 
+/* Mark animation: left to right */
+.highlighter-mark.animate-draw-mark {
+  background-size: 0% 100%;
+  background-position: left;
+  animation: highlighterDraw 0.4s ease-out forwards;
+}
+
+/* Unmark animation: right to left erase */
+.highlighter-mark.animate-draw-unmark {
+  background-size: 100% 100%;
+  background-position: right;
+  animation: highlighterErase 0.4s ease-in forwards;
+}
+
+@keyframes highlighterErase {
+  from { background-size: 100% 100%; }
+  to { background-size: 0% 100%; }
+}
+
 /* Tooltip on hover */
 .highlighter-mark::after {
   content: "Moment marked";

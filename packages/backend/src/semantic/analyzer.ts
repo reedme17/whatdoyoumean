@@ -241,6 +241,7 @@ const SYSTEM_PROMPT = `You are a semantic analysis engine. Given a transcript se
 CRITICAL: The "content" field MUST be in the SAME LANGUAGE as the transcript segment. If the input is Chinese, respond in Chinese. If English, respond in English. If mixed, use the dominant language.
 CRITICAL: Write content as a DIRECT summary of what was said — NOT in third person. Do NOT write "The speaker says..." or "The person thinks...". Instead, directly state the point: "Vanessa was more energetic before" not "The speaker says Vanessa was more energetic".
 CRITICAL: NEVER use these phrases: "The speaker", "The person", "Appreciation is expressed", "It is stated", "One believes". Write as if quoting the actual point made. WRONG: "The speaker is upset" → RIGHT: "I'm upset about this". WRONG: "Appreciation is expressed" → RIGHT: "Thank you so much".
+CRITICAL: NO attribution or third person. Never use "I said," "I discussed," "The speaker mentioned," or "You are asking." Use DIRECT SPEECH — speak as if delivering the point right now. WRONG: "I am asking for clarification" or "You are asking for clarification" → RIGHT: "What exactly does this mean?"
 
 Respond ONLY with valid JSON in this exact format:
 {
@@ -269,6 +270,7 @@ Respond ONLY with a valid JSON array. Each element has this format:
 }
 
 CRITICAL: Write content as a DIRECT summary — NOT in third person. NEVER use "The speaker", "The person", "It is stated", "Appreciation is expressed", or any passive/third-person phrasing. State the point directly as said. WRONG: "The speaker is upset" → RIGHT: "I'm upset about this". WRONG: "Appreciation is expressed" → RIGHT: "Thank you so much". WRONG: "The speaker disagrees" → RIGHT: "I disagree with that".
+CRITICAL: NO attribution or third person. Never use "I said," "I discussed," "The speaker mentioned," or "You are asking." Use DIRECT SPEECH — speak as if delivering the point right now. WRONG: "I am asking for clarification" or "You are asking for clarification" → RIGHT: "What exactly does this mean?"
 
 Example: [{"content":"The meeting is at 3pm","category":"fact"},{"content":"We should cancel the project","category":"opinion"}]
 

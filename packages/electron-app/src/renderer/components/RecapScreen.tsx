@@ -33,6 +33,7 @@ interface Props {
   onSpeakerRename?: (speakerKey: string, name: string) => void;
   /** Called when per-group speaker name overrides change (for export) */
   onGroupOverridesChange?: (overrides: Map<number, { speakerKey: string; name: string }>) => void;
+  onToggleMark?: (cardId: string) => void;
 }
 
 export function RecapScreen({
@@ -53,6 +54,7 @@ export function RecapScreen({
   topRightContent,
   onSpeakerRename,
   onGroupOverridesChange,
+  onToggleMark,
 }: Props): React.JSX.Element {
   // Suppress hover on X icon for 300ms after mount (End button overlaps X position)
   const [xReady, setXReady] = useState(false);
@@ -225,7 +227,7 @@ export function RecapScreen({
                 {group.cards.map((card, i) => (
                   <React.Fragment key={card.id}>
                     {i > 0 && <div className="w-full h-px bg-border" />}
-                    <CoreMeaningCardView card={card} animateHighlight highlightIndex={card.isHighlighted ? highlightCounter++ : 0} />
+                    <CoreMeaningCardView card={card} animateHighlight highlightIndex={card.isHighlighted ? highlightCounter++ : 0} onToggleMark={onToggleMark} />
                   </React.Fragment>
                 ))}
               </div>

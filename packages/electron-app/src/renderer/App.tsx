@@ -82,6 +82,16 @@ export function App(): React.JSX.Element {
   // ── Per-group speaker name overrides from RecapScreen ──
   const [groupOverrides, setGroupOverrides] = useState<Map<number, { speakerKey: string; name: string }>>(new Map());
 
+  // Refs for latest state (used in session save inside useCallback closure)
+  const cardsRef = useRef<CoreMeaningCard[]>([]);
+  cardsRef.current = cards;
+  const recommendationsRef = useRef<Recommendation[]>([]);
+  recommendationsRef.current = recommendations;
+  const transcriptTextsRef = useRef<string[]>([]);
+  transcriptTextsRef.current = transcriptTexts;
+  const speakersRef = useRef<Map<string, string>>(new Map());
+  speakersRef.current = speakers;
+
   // ── WebSocket ──
   // ── WebSocket ──
   const handleServerEvent = useCallback((event: ServerEvent) => {
@@ -94,8 +104,11 @@ export function App(): React.JSX.Element {
           console.log("[App] Ignoring late card:created on screen:", s);
           break;
         }
-        setCards((prev) => [...prev, newCard]);
-        setTextCards((prev) => [...prev, newCard]);
+        if (s === "text") {
+          setTextCards((prev) => [...prev, newCard]);
+        } else {
+          setCards((prev) => [...prev, newCard]);
+        }
         setAnalyzing(false);
         setPendingPreview("");
         break;
@@ -134,7 +147,8 @@ export function App(): React.JSX.Element {
 
       case "transcript:final": {
         const seg = (event as any).segment;
-        if (seg?.text) setTranscriptTexts((prev) => [...prev, seg.text]);
+        // Only accumulate transcript for audio mode — text mode sets it in handleTextAnalyze
+        if (seg?.text && screenRef.current !== "text") setTranscriptTexts((prev) => [...prev, seg.text]);
         // Track speaker from Deepgram diarization
         if (seg?.speakerId && seg.speakerId !== "user") {
           console.log(`[App] Speaker detected: ${seg.speakerId}`);
@@ -157,6 +171,20 @@ export function App(): React.JSX.Element {
       case "session:state": {
         const sessionState = (event as Extract<ServerEvent, { type: "session:state" }>).state;
         if (sessionState === "ended" && screenRef.current === "processing") {
+          // Save session with final consolidated cards
+          const duration = Math.round((Date.now() - sessionStartRef.current) / 60000);
+          setSessions((prev) => {
+            // Update the most recent session with final data, or remove if nothing captured
+            if (prev.length > 0 && prev[0].mode === "online") {
+              if (cardsRef.current.length === 0) {
+                // Nothing captured — remove the placeholder session
+                return prev.slice(1);
+              }
+              const updated = { ...prev[0], cards: [...cardsRef.current], recommendations: [...recommendationsRef.current], transcriptTexts: [...transcriptTextsRef.current], speakers: new Map(speakersRef.current) };
+              return [updated, ...prev.slice(1)];
+            }
+            return prev;
+          });
           goToScreen("recap");
         }
         break;
@@ -185,6 +213,28 @@ export function App(): React.JSX.Element {
 
   // ── Audio capture (renderer-side mic → base64 WAV → backend via WS) ──
   const { startCapture, stopCapture, isCapturing, error: audioError, analyser } = useAudioCapture({ send, mode: "online", captureSystem: audioSource === "mic+system" });
+
+  // Save text mode session when analysis completes
+  const prevTextCardsLen = useRef(0);
+  useEffect(() => {
+    if (screen === "text" && textCards.length > 0 && prevTextCardsLen.current === 0) {
+      setSessions((prev) => [
+        {
+          id: "session_text_" + Date.now(),
+          date: new Date().toLocaleDateString(),
+          timestamp: Date.now(),
+          durationMin: 0,
+          topicSummary: textCards[0]?.content?.slice(0, 40) ?? "Text analysis",
+          mode: "text",
+          cards: [...textCards],
+          recommendations: [...textRecs],
+          transcriptTexts: [...transcriptTexts],
+        },
+        ...prev,
+      ]);
+    }
+    prevTextCardsLen.current = textCards.length;
+  }, [textCards.length]);
 
   // ── Handlers ──
 
@@ -272,9 +322,14 @@ export function App(): React.JSX.Element {
       {
         id: "session_" + Date.now(),
         date: new Date().toLocaleDateString(),
+        timestamp: Date.now(),
         durationMin: Math.max(1, duration),
         topicSummary: summary,
         mode: "online",
+        cards: [...cards],
+        recommendations: [...recommendations],
+        transcriptTexts: [...transcriptTexts],
+        speakers: new Map(speakers),
       },
       ...prev,
     ]);
@@ -293,14 +348,8 @@ export function App(): React.JSX.Element {
     };
     setBookmarks((prev) => [...prev, bm]);
     send({ type: "bookmark:create", timestamp: ts });
-
-    // Highlight the most recent card
-    setCards((prev) => {
-      if (prev.length === 0) return prev;
-      const updated = [...prev];
-      updated[updated.length - 1] = { ...updated[updated.length - 1], isHighlighted: true };
-      return updated;
-    });
+    // Backend handles highlighting — either marks the last card (card:updated)
+    // or force-finalizes pending text and marks the new card (card:created with isHighlighted)
   };
 
   const handleTextAnalyze = async (text: string) => {
@@ -454,6 +503,7 @@ export function App(): React.JSX.Element {
             data.map((s: Record<string, unknown>) => ({
               id: s.id as string,
               date: new Date(s.startedAt as string).toLocaleDateString(),
+              timestamp: new Date(s.startedAt as string).getTime(),
               durationMin: Math.round((s.durationMs as number) / 60000),
               topicSummary: (s.topicSummary as string) || "Untitled",
               mode: s.mode as "online" | "offline" | "text",
@@ -589,6 +639,9 @@ export function App(): React.JSX.Element {
             });
           }}
           onGroupOverridesChange={setGroupOverrides}
+          onToggleMark={(cardId) => {
+            setCards((prev) => prev.map((c) => c.id === cardId ? { ...c, isHighlighted: !c.isHighlighted } : c));
+          }}
         />
         </div>
       )}
@@ -633,6 +686,7 @@ export function App(): React.JSX.Element {
         onSttLanguageChange={setSttLanguage}
         responseEnabled={responseEnabled}
         onResponseEnabledChange={setResponseEnabled}
+        onViewOnboarding={() => goToScreen("onboarding")}
       />
 
 

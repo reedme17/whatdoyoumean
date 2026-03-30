@@ -1,0 +1,27 @@
+import type { HTMLAttributes } from "react";
+import { cn } from "../../lib/utils.js";
+
+interface MapPinMinusInsideIconProps extends HTMLAttributes<HTMLDivElement> {
+  size?: number;
+}
+
+export function MapPinMinusInsideIcon({ className, size = 28, ...props }: MapPinMinusInsideIconProps) {
+  return (
+    <div className={cn(className)} {...props}>
+      <svg
+        fill="none"
+        height={size}
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+        viewBox="0 0 24 24"
+        width={size}
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" />
+        <path d="M9 10h6" />
+      </svg>
+    </div>
+  );
+}
