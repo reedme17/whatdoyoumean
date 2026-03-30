@@ -48,6 +48,7 @@ export function useSocket(onEvent: ServerEventHandler): UseSocketReturn {
       "pending:preview",
       "error",
       "session:state",
+      "processing:progress",
     ];
 
     for (const type of eventTypes) {

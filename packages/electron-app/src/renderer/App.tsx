@@ -63,9 +63,9 @@ export function App(): React.JSX.Element {
   const [speakers, setSpeakers] = useState<Map<string, string>>(new Map());
   const [speakerName, setSpeakerName] = useState("");
   const sessionStartRef = useRef<number>(0);
-  const [audioSource, setAudioSource] = useState<"mic" | "mic+system">("mic");
-  const [sttLanguage, setSttLanguage] = useState<SttLanguage>("zh+en");
-  const [responseEnabled, setResponseEnabled] = useState(false);
+  const [audioSource, setAudioSource] = useState<"mic" | "internal" | "mic+internal">("mic");
+  const [sttLanguage, setSttLanguage] = useState<SttLanguage>("en");
+  const [responseEnabled, setResponseEnabled] = useState(true);
 
   const [pendingPreview, setPendingPreview] = useState<string>("");
   const [transcriptTexts, setTranscriptTexts] = useState<string[]>([]);
@@ -74,6 +74,7 @@ export function App(): React.JSX.Element {
   const [textCards, setTextCards] = useState<CoreMeaningCard[]>([]);
   const [textRecs, setTextRecs] = useState<Recommendation[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
+  const [processingStage, setProcessingStage] = useState("");
 
   // ── Expand panel ──
   const [panelOpen, setPanelOpen] = useState(false);
@@ -185,10 +186,18 @@ export function App(): React.JSX.Element {
             }
             return prev;
           });
-          goToScreen("recap");
+          // Brief delay so the last processing stage text is visible
+          setTimeout(() => {
+            if (screenRef.current === "processing") goToScreen("recap");
+          }, 600);
         }
         break;
       }
+
+      case "processing:progress":
+        console.log("[App] processing:progress received:", (event as Extract<ServerEvent, { type: "processing:progress" }>).stage);
+        setProcessingStage((event as Extract<ServerEvent, { type: "processing:progress" }>).stage);
+        break;
 
       default:
         break;
@@ -212,7 +221,7 @@ export function App(): React.JSX.Element {
   }, [responseEnabled, screen, textCards.length, textRecs.length, send]);
 
   // ── Audio capture (renderer-side mic → base64 WAV → backend via WS) ──
-  const { startCapture, stopCapture, isCapturing, error: audioError, analyser } = useAudioCapture({ send, mode: "online", captureSystem: audioSource === "mic+system" });
+  const { startCapture, stopCapture, isCapturing, error: audioError, analyser } = useAudioCapture({ send, mode: "online", audioSource });
 
   // Save text mode session when analysis completes
   const prevTextCardsLen = useRef(0);
@@ -305,6 +314,7 @@ export function App(): React.JSX.Element {
 
     // Show processing screen while backend finalizes pending text
     goToScreen("processing");
+    setProcessingStage("");
     send({ type: "session:end" });
 
     // Fallback: if session:ended never arrives, go to recap after 15s
@@ -567,11 +577,8 @@ export function App(): React.JSX.Element {
             resetSession();
             goToScreen("text");
           }}
-          audioSource={audioSource}
           onExpand={() => setPanelOpen(true)}
           panelOpen={panelOpen}
-          onToggleAudioSource={() => setAudioSource((s) => s === "mic" ? "mic+system" : "mic")}
-          sttLanguage={sttLanguage}
         />
         </div>
       )}
@@ -606,13 +613,14 @@ export function App(): React.JSX.Element {
           onSttLanguageChange={setSttLanguage}
           responseEnabled={responseEnabled}
           onResponseEnabledChange={setResponseEnabled}
+          audioSource={audioSource}
+          onAudioSourceChange={setAudioSource}
         />
       )}
 
       {screen === "processing" && (
         <div key="processing" className="screen-enter flex flex-col items-center justify-center h-full bg-background text-foreground gap-4">
-          <span className="font-sans text-sm text-[#93918E]">Processing...</span>
-          <div className="h-px bg-border overflow-hidden" style={{ animation: "expandLine 2s ease-in-out infinite" }} />
+          <span className="font-sans text-sm text-[#93918E]">{processingStage || "Wrapping up..."}</span>
         </div>
       )}
 
@@ -665,6 +673,9 @@ export function App(): React.JSX.Element {
           responseEnabled={responseEnabled}
           onResponseEnabledChange={setResponseEnabled}
           onExportMd={handleExportMd}
+          onToggleMark={(cardId) => {
+            setTextCards((prev) => prev.map((c) => c.id === cardId ? { ...c, isHighlighted: !c.isHighlighted } : c));
+          }}
         />
         </div>
       )}
@@ -686,6 +697,8 @@ export function App(): React.JSX.Element {
         onSttLanguageChange={setSttLanguage}
         responseEnabled={responseEnabled}
         onResponseEnabledChange={setResponseEnabled}
+        audioSource={audioSource}
+        onAudioSourceChange={setAudioSource}
         onViewOnboarding={() => goToScreen("onboarding")}
       />
 

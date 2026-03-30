@@ -13,12 +13,17 @@ const TARGET_SAMPLE_RATE = 16000;
 /** Chunk duration in seconds — short for low-latency streaming */
 const CHUNK_DURATION_SEC = 0.25;
 
+/** Audio source mode */
+export type AudioSourceMode = "mic" | "internal" | "mic+internal";
+
 interface UseAudioCaptureOptions {
   /** WebSocket send function from useSocket */
   send: (event: { type: string; [key: string]: unknown }) => void;
   /** Capture mode: "online" captures mic + system audio, "offline" captures mic only */
   mode?: "online" | "offline";
-  /** Whether to also capture system audio via desktopCapturer */
+  /** Audio source: "mic" (default), "internal" (system audio only), "mic+internal" (both, future) */
+  audioSource?: AudioSourceMode;
+  /** @deprecated Use audioSource instead */
   captureSystem?: boolean;
 }
 
@@ -117,7 +122,7 @@ function calculateRMS(samples: Float32Array): number {
   return Math.sqrt(sum / samples.length);
 }
 
-export function useAudioCapture({ send, mode = "offline", captureSystem = false }: UseAudioCaptureOptions): UseAudioCaptureReturn {
+export function useAudioCapture({ send, mode = "offline", audioSource = "mic", captureSystem = false }: UseAudioCaptureOptions): UseAudioCaptureReturn {
   const [isCapturing, setIsCapturing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -129,6 +134,7 @@ export function useAudioCapture({ send, mode = "offline", captureSystem = false 
   const accumulatorRef = useRef<Float32Array[]>([]);
   const accumulatedSamplesRef = useRef(0);
   const capturingRef = useRef(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
 
   const flushChunk = useCallback(() => {
     const chunks = accumulatorRef.current;
@@ -169,6 +175,120 @@ export function useAudioCapture({ send, mode = "offline", captureSystem = false 
   const startCapture = useCallback(async () => {
     setError(null);
 
+    console.log("[AudioCapture] startCapture called, audioSource:", audioSource);
+    const useInternal = audioSource === "internal";
+
+    // ── Internal mode: capture system audio via MediaRecorder (no AudioContext) ──
+    if (useInternal) {
+      if (!(window as any).electronAPI?.getDesktopSources) {
+        setError("System audio capture requires Electron desktop API");
+        console.warn("[AudioCapture] electronAPI.getDesktopSources not available");
+        return;
+      }
+
+      try {
+        const sources = await (window as any).electronAPI.getDesktopSources();
+        const screenSource = sources.find((s: { name: string }) =>
+          s.name.includes("Entire Screen") || s.name.includes("Screen")
+        ) ?? sources[0];
+
+        if (!screenSource) {
+          setError("No screen source available for system audio");
+          return;
+        }
+
+        const systemStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            mandatory: {
+              chromeMediaSource: "desktop",
+              chromeMediaSourceId: screenSource.id,
+            },
+          } as any,
+          video: {
+            mandatory: {
+              chromeMediaSource: "desktop",
+              chromeMediaSourceId: screenSource.id,
+              maxWidth: 1,
+              maxHeight: 1,
+              maxFrameRate: 1,
+            },
+          } as any,
+        });
+        systemStream.getVideoTracks().forEach((t) => t.stop());
+        systemStreamRef.current = systemStream;
+        console.log("[AudioCapture] System audio stream acquired, tracks:", systemStream.getAudioTracks().length);
+
+        // Use MediaRecorder to capture audio, then decode accumulated blobs
+        const audioOnlyStream = new MediaStream(systemStream.getAudioTracks());
+        const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : "audio/webm";
+        const recorder = new MediaRecorder(audioOnlyStream, { mimeType });
+        mediaRecorderRef.current = recorder;
+
+        // Accumulate all blobs from session start — needed because webm needs headers from first chunk
+        const allChunks: Blob[] = [];
+        let lastSentBlobSize = 0;
+
+        recorder.ondataavailable = (e: BlobEvent) => {
+          if (!capturingRef.current || e.data.size === 0) return;
+          allChunks.push(e.data);
+          console.log(`[AudioCapture] MediaRecorder chunk: ${e.data.size} bytes, total chunks: ${allChunks.length}`);
+        };
+
+        // Periodically decode accumulated audio and send new portion
+        const decodeInterval = setInterval(async () => {
+          if (!capturingRef.current || allChunks.length === 0) return;
+
+          try {
+            const fullBlob = new Blob(allChunks, { type: mimeType });
+            if (fullBlob.size <= lastSentBlobSize) return; // no new data
+
+            const arrayBuf = await fullBlob.arrayBuffer();
+            // OfflineAudioContext needs enough frames — use 30s buffer at target rate
+            const offlineCtx = new OfflineAudioContext(1, TARGET_SAMPLE_RATE * 30, TARGET_SAMPLE_RATE);
+            const audioBuf = await offlineCtx.decodeAudioData(arrayBuf);
+            const fullPcm = audioBuf.getChannelData(0);
+
+            // Only send the new portion since last send
+            const prevSamples = Math.round((lastSentBlobSize / fullBlob.size) * fullPcm.length);
+            const newPcm = fullPcm.slice(Math.max(0, prevSamples));
+            lastSentBlobSize = fullBlob.size;
+
+            if (newPcm.length < 100) return; // too small
+
+            const downsampled = audioBuf.sampleRate !== TARGET_SAMPLE_RATE
+              ? downsample(new Float32Array(newPcm), audioBuf.sampleRate, TARGET_SAMPLE_RATE)
+              : new Float32Array(newPcm);
+
+            const wavBase64 = encodeWavBase64(downsampled, TARGET_SAMPLE_RATE);
+            send({
+              type: "audio:chunk",
+              audioBase64: wavBase64,
+              format: "wav",
+              sampleRate: TARGET_SAMPLE_RATE,
+            });
+            console.log(`[AudioCapture] Sent internal audio: ${downsampled.length} samples`);
+          } catch (decodeErr) {
+            console.warn("[AudioCapture] Internal decode error:", (decodeErr as Error).message);
+          }
+        }, 1000); // decode every 1 second
+
+        // Store interval for cleanup
+        (recorder as any)._decodeInterval = decodeInterval;
+
+        recorder.start(500); // collect chunks every 500ms
+
+        capturingRef.current = true;
+        setIsCapturing(true);
+        console.log("[AudioCapture] Started INTERNAL mode via MediaRecorder");
+        return;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setError(msg);
+        console.error("[AudioCapture] Internal audio capture failed:", msg);
+        return;
+      }
+    }
+    // ── Mic mode (default) ──
     if (!navigator.mediaDevices?.getUserMedia) {
       setError("getUserMedia not available");
       console.warn("[AudioCapture] getUserMedia not available — falling back to stub");
@@ -176,7 +296,6 @@ export function useAudioCapture({ send, mode = "offline", captureSystem = false 
     }
 
     try {
-      // 1. Get microphone stream
       const micStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           channelCount: 1,
@@ -188,122 +307,64 @@ export function useAudioCapture({ send, mode = "offline", captureSystem = false 
       });
       streamRef.current = micStream;
 
-      // 2. Try to get system audio (only when user explicitly enables it)
-      let systemStream: MediaStream | null = null;
-      if (captureSystem && (window as any).electronAPI?.getDesktopSources) {
-        try {
-          const sources = await (window as any).electronAPI.getDesktopSources();
-          const screenSource = sources.find((s: { name: string }) =>
-            s.name.includes("Entire Screen") || s.name.includes("Screen")
-          ) ?? sources[0];
-
-          if (screenSource) {
-            systemStream = await navigator.mediaDevices.getUserMedia({
-              audio: {
-                mandatory: {
-                  chromeMediaSource: "desktop",
-                  chromeMediaSourceId: screenSource.id,
-                },
-              } as any,
-              video: {
-                mandatory: {
-                  chromeMediaSource: "desktop",
-                  chromeMediaSourceId: screenSource.id,
-                  maxWidth: 1,
-                  maxHeight: 1,
-                  maxFrameRate: 1,
-                },
-              } as any,
-            });
-            systemStream.getVideoTracks().forEach((t) => t.stop());
-            systemStreamRef.current = systemStream;
-            console.log("[AudioCapture] System audio captured via desktopCapturer");
-          }
-        } catch (sysErr) {
-          console.warn("[AudioCapture] System audio capture failed:", sysErr);
-        }
-      }
-
-      // 3. Set up AudioContext and mix streams
-      // Use default sample rate (let the browser pick the best one)
       const audioContext = new AudioContext();
       contextRef.current = audioContext;
 
-      // Wait for AudioContext to be running (may be suspended on some systems)
       if (audioContext.state === "suspended") {
         await audioContext.resume();
       }
 
       const micSource = audioContext.createMediaStreamSource(micStream);
 
-      // If we have system audio, mix it with mic
-      let mixedSource: AudioNode;
-      if (systemStream && systemStream.getAudioTracks().length > 0) {
-        try {
-          const sysSource = audioContext.createMediaStreamSource(systemStream);
-          const merger = audioContext.createChannelMerger(2);
-          micSource.connect(merger, 0, 0);
-          sysSource.connect(merger, 0, 1);
-          const monoMixer = audioContext.createGain();
-          merger.connect(monoMixer);
-          mixedSource = monoMixer;
-          console.log("[AudioCapture] Mixing mic + system audio");
-        } catch (mixErr) {
-          console.warn("[AudioCapture] Failed to mix system audio, using mic only:", mixErr);
-          // Clean up system stream
-          systemStream.getTracks().forEach((t) => t.stop());
-          systemStreamRef.current = null;
-          mixedSource = micSource;
-        }
-      } else {
-        mixedSource = micSource;
-        console.log("[AudioCapture] Mic only (no system audio)");
-      }
-
       const processor = audioContext.createScriptProcessor(4096, 1, 1);
       processorRef.current = processor;
 
-      // Create analyser for waveform visualization
       const analyser = audioContext.createAnalyser();
       analyser.fftSize = 256;
       analyser.smoothingTimeConstant = 0.8;
       analyserRef.current = analyser;
-      mixedSource.connect(analyser);
+      micSource.connect(analyser);
 
       const samplesPerChunk = audioContext.sampleRate * CHUNK_DURATION_SEC;
 
       processor.onaudioprocess = (e: AudioProcessingEvent) => {
         if (!capturingRef.current) return;
-
         const inputData = e.inputBuffer.getChannelData(0);
-        // Copy the buffer (it gets reused)
         const copy = new Float32Array(inputData.length);
         copy.set(inputData);
-
         accumulatorRef.current.push(copy);
         accumulatedSamplesRef.current += copy.length;
-
-        // Flush when we've accumulated enough for one chunk
         if (accumulatedSamplesRef.current >= samplesPerChunk) {
           flushChunk();
         }
       };
 
-      mixedSource.connect(processor);
+      micSource.connect(processor);
       processor.connect(audioContext.destination);
 
       capturingRef.current = true;
       setIsCapturing(true);
-      console.log(`[AudioCapture] Started — native rate: ${audioContext.sampleRate}Hz`);
+      console.log(`[AudioCapture] Started MIC mode — native rate: ${audioContext.sampleRate}Hz`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setError(msg);
       console.error("[AudioCapture] Failed to start:", msg);
     }
-  }, [flushChunk]);
+  }, [flushChunk, audioSource]);
 
   const stopCapture = useCallback(() => {
     capturingRef.current = false;
+
+    // Stop MediaRecorder if active (internal mode)
+    if (mediaRecorderRef.current) {
+      if ((mediaRecorderRef.current as any)._decodeInterval) {
+        clearInterval((mediaRecorderRef.current as any)._decodeInterval);
+      }
+      if (mediaRecorderRef.current.state !== "inactive") {
+        try { mediaRecorderRef.current.stop(); } catch {}
+      }
+    }
+    mediaRecorderRef.current = null;
 
     // Flush any remaining audio
     if (accumulatorRef.current.length > 0) {

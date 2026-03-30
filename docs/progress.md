@@ -1079,3 +1079,54 @@ Replaced 6 meaning categories with a cleaner set. Removed `factual_statement` (�
 - `packages/electron-app/src/renderer/components/ui/chevron-down-icon.tsx` (new)
 - `packages/electron-app/src/renderer/components/ui/map-pin-minus-icon.tsx` (new)
 - `packages/electron-app/src/renderer/globals.css` (mark/unmark keyframes)
+
+---
+
+## Phase 37: Audio Source Settings, Internal Audio Attempt, Shared Settings Component
+
+### Shared SettingsControls Component
+- New `SettingsControls.tsx`: shared settings UI with `variant="full"` (Language + Audio source + Response) and `variant="response-only"` (Response toggle only)
+- Used by: ExpandPanel (full), BottomBar (full), RecapScreen (response-only), TextModeScreen input page (response-only), TextModeScreen results page (response-only via RecapScreen)
+- Eliminates duplicated Tabs/TabsTrigger code across 5 locations
+- All settings share the same state from App.tsx — changing in one place updates everywhere
+
+### Audio Source Mode
+- New `AudioSourceMode` type: `"mic" | "internal" | "mic+internal"`
+- `useAudioCapture.ts`: accepts `audioSource` parameter, routes to different capture paths
+- Mic mode: existing `getUserMedia` + `AudioContext` + `ScriptProcessorNode` path (unchanged)
+- Internal mode: `desktopCapturer` → `MediaRecorder` (webm/opus) → `OfflineAudioContext.decodeAudioData` → PCM → WAV → backend
+- MediaRecorder approach chosen because `AudioContext.createMediaStreamSource()` with desktopCapturer streams crashes on Electron 33 + macOS ("The AudioContext encountered an error from the audio device or the WebAudio renderer")
+- Attempted fixes: silent GainNode (still crashed), separate AudioContext (still crashed) — the crash happens at `createMediaStreamSource()` itself
+
+### macOS desktopCapturer Limitation
+- `desktopCapturer` on macOS returns an audio track with 0 data — `MediaRecorder.ondataavailable` never fires
+- macOS does not provide system audio loopback natively; `chromeMediaSource: "desktop"` only captures screen video, not audio
+- Internal and Both modes disabled in UI (greyed out with `opacity-40 cursor-not-allowed`)
+- Internal mode code preserved for future use with BlackHole virtual audio device or native ScreenCaptureKit addon
+
+### UI Changes
+- ExpandPanel: "Source" renamed to "Audio source", tab order changed to Mic → Internal → Both (was Both → Mic → Internal)
+- BottomBar: same Audio source tabs, consistent with ExpandPanel
+- HomeScreen: removed audio source selector (was incorrectly added to home page)
+- Processing screen: text changed from "Processing..." to `processingStage` state with fallback "Wrapping up..."
+- Processing screen font: reverted to `font-sans text-sm text-[#93918E]` (was briefly changed to serif)
+
+### Backend Processing Stages
+- `ws/handler.ts` session:end now emits `processing:progress` events at each stage:
+  1. "Wrapping up..." — entering session:end
+  2. "Finalizing..." — flushing pending text
+  3. "Putting it together..." — running final consolidation
+  4. "Almost there..." — about to emit session:ended
+- Frontend displays these in real-time on the processing screen
+
+### Changed Files
+- `packages/electron-app/src/renderer/components/SettingsControls.tsx` (new)
+- `packages/electron-app/src/renderer/hooks/useAudioCapture.ts` (AudioSourceMode, internal mode via MediaRecorder, stopCapture cleanup)
+- `packages/electron-app/src/renderer/App.tsx` (audioSource state, processing screen text, props wiring)
+- `packages/electron-app/src/renderer/components/ExpandPanel.tsx` (rewritten — SettingsControls, fixed imports)
+- `packages/electron-app/src/renderer/components/BottomBar.tsx` (SettingsControls, audioSource props)
+- `packages/electron-app/src/renderer/components/LiveSession.tsx` (audioSource props passthrough)
+- `packages/electron-app/src/renderer/components/RecapScreen.tsx` (SettingsControls response-only)
+- `packages/electron-app/src/renderer/components/TextModeScreen.tsx` (SettingsControls response-only)
+- `packages/electron-app/src/renderer/components/HomeScreen.tsx` (removed audio source selector, cleaned props)
+- `packages/backend/src/ws/handler.ts` (processing:progress stage text)

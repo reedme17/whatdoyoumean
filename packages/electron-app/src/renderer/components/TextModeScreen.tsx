@@ -12,7 +12,7 @@ import { FeatherIcon } from "./ui/feather-icon.js";
 import { DownloadPopover } from "./DownloadPopover.js";
 import { SlidersHorizontalIcon } from "./ui/sliders-icon.js";
 import { Popover, PopoverTrigger, PopoverContent } from "./ui/popover.js";
-import { Tabs, TabsList, TabsTrigger } from "./ui/tabs.js";
+import { SettingsControls } from "./SettingsControls.js";
 
 interface Props {
   onAnalyze: (text: string) => void;
@@ -24,6 +24,7 @@ interface Props {
   onExportMd?: () => void;
   responseEnabled?: boolean;
   onResponseEnabledChange?: (v: boolean) => void;
+  onToggleMark?: (cardId: string) => void;
 }
 
 export function TextModeScreen({
@@ -36,6 +37,7 @@ export function TextModeScreen({
   responseEnabled = false,
   onExportMd,
   onResponseEnabledChange,
+  onToggleMark,
 }: Props): React.JSX.Element {
   const [text, setText] = useState("");
   const hasResults = cards.length > 0;
@@ -64,11 +66,12 @@ export function TextModeScreen({
         responseEnabled={responseEnabled}
         topRightContent={
           <div className="flex items-center gap-4">
-            <button className="text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0" onClick={() => onReset?.()} title="Edit"><FeatherIcon size={18} /></button>
+            <button className="text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0" onClick={() => onReset?.()} title="Edit input"><FeatherIcon size={18} /></button>
             <DownloadPopover onCopy={() => { const md = cards.map((c) => `- **[${c.category}]** ${c.content}`).join("\n"); navigator.clipboard.writeText(md); }} onExportMd={() => onExportMd?.()} />
           </div>
         }
         onResponseEnabledChange={onResponseEnabledChange}
+        onToggleMark={onToggleMark}
       />
     );
   }
@@ -104,22 +107,22 @@ export function TextModeScreen({
         <div className="flex items-center gap-4">
           <Popover>
             <PopoverTrigger asChild>
-              <button className="text-[#93918E] hover:text-[#60594D] transition-colors cursor-pointer bg-transparent border-none p-0">
-                <SlidersHorizontalIcon size={16} />
+              <button className="text-[#93918E] hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0" title="Settings" aria-label="Settings">
+                <SlidersHorizontalIcon size={18} />
               </button>
             </PopoverTrigger>
             <PopoverContent side="top" align="end" className="w-[160px] p-3">
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-sans font-medium text-[#60594D]">Response recommendation</span>
-                <Tabs value={responseEnabled ? "on" : "off"} onValueChange={(v) => onResponseEnabledChange?.(v === "on")}>
-                  <TabsList><TabsTrigger value="on">On</TabsTrigger><TabsTrigger value="off">Off</TabsTrigger></TabsList>
-                </Tabs>
-              </div>
+              <SettingsControls
+                variant="response-only"
+                responseEnabled={responseEnabled}
+                onResponseEnabledChange={onResponseEnabledChange}
+              />
             </PopoverContent>
           </Popover>
           <button
             className="text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none"
             onClick={onClose}
+            title="Close"
             aria-label="Close text mode"
           >
             <XIcon size={20} />

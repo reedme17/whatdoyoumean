@@ -11,7 +11,7 @@ import { XIcon } from "./ui/x-icon.js";
 import { SlidersHorizontalIcon } from "./ui/sliders-icon.js";
 import { DownloadPopover } from "./DownloadPopover.js";
 import { Popover, PopoverTrigger, PopoverContent } from "./ui/popover.js";
-import { Tabs, TabsList, TabsTrigger } from "./ui/tabs.js";
+import { SettingsControls } from "./SettingsControls.js";
 import { ChevronDownIcon } from "./ui/chevron-down-icon.js";
 
 interface Props {
@@ -273,17 +273,16 @@ export function RecapScreen({
           {onResponseEnabledChange && (
           <Popover>
             <PopoverTrigger asChild>
-              <button className="text-[#93918E] hover:text-[#60594D] transition-colors cursor-pointer bg-transparent border-none p-0">
-                <SlidersHorizontalIcon size={16} />
+              <button className="text-[#93918E] hover:text-[#60594D] transition-colors cursor-pointer bg-transparent border-none p-0" title="Settings" aria-label="Settings">
+                <SlidersHorizontalIcon size={18} />
               </button>
             </PopoverTrigger>
             <PopoverContent side="top" align="end" className="w-[160px] p-3">
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-sans font-medium text-[#60594D]">Response recommendation</span>
-                <Tabs value={responseEnabled ? "on" : "off"} onValueChange={(v) => onResponseEnabledChange?.(v === "on")}>
-                  <TabsList><TabsTrigger value="on">On</TabsTrigger><TabsTrigger value="off">Off</TabsTrigger></TabsList>
-                </Tabs>
-              </div>
+              <SettingsControls
+                variant="response-only"
+                responseEnabled={responseEnabled}
+                onResponseEnabledChange={onResponseEnabledChange}
+              />
             </PopoverContent>
           </Popover>
           )}
@@ -291,6 +290,7 @@ export function RecapScreen({
             className="text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none"
             style={xReady ? undefined : { pointerEvents: "none" }}
             onClick={onClose}
+            title="Close"
             aria-label="Close recap"
           >
             <XIcon size={20} />

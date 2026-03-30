@@ -12,11 +12,8 @@ import type { SttLanguage } from "./ExpandPanel.js";
 interface Props {
   onStart: () => void;
   onTextMode: () => void;
-  audioSource: "mic" | "mic+system";
-  onToggleAudioSource: () => void;
   onExpand: () => void;
   panelOpen: boolean;
-  sttLanguage: SttLanguage;
 }
 
 export function HomeScreen({ onStart, onTextMode, onExpand, panelOpen }: Props): React.JSX.Element {

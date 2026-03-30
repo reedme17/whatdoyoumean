@@ -47,4 +47,5 @@ export type ServerEvent =
   | { type: 'stt:provider_switch'; from: string; to: string }
   | { type: 'pending:preview'; text: string }
   | { type: 'error'; subsystem: string; message: string; recoverable: boolean }
-  | { type: 'session:state'; state: 'active' | 'paused' | 'ended' };
+  | { type: 'session:state'; state: 'active' | 'paused' | 'ended' }
+  | { type: 'processing:progress'; stage: string };

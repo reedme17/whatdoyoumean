@@ -4,16 +4,17 @@
  * Settings/About: CSS accordion animation.
  */
 
-import React, { useState } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import type { CoreMeaningCard, Recommendation } from "@wdym/shared";
 import { Drawer, DrawerContent } from "./ui/drawer.js";
 import { SidebarButton } from "./ui/sidebar-button.js";
 import { XIcon } from "./ui/x-icon.js";
 import { ChevronIcon } from "./ui/chevron-icon.js";
-import { Tabs, TabsList, TabsTrigger } from "./ui/tabs.js";
 import { CoreMeaningCardView } from "./CoreMeaningCard.js";
 import { RecommendationTokens } from "./RecommendationTokens.js";
 import { DownloadPopover } from "./DownloadPopover.js";
+import type { AudioSourceMode } from "../hooks/useAudioCapture.js";
+import { SettingsControls } from "./SettingsControls.js";
 
 export type SttLanguage = "zh+en" | "en" | "zh" | "auto";
 
@@ -66,7 +67,7 @@ const ACC_OPEN: React.CSSProperties = { maxHeight: 200, opacity: 1, transition: 
 const ACC_CLOSED: React.CSSProperties = { maxHeight: 0, opacity: 0, transition: "max-height 0.25s ease-out, opacity 0.2s ease-out", overflow: "hidden" };
 
 export function ExpandPanel({
-  open, onClose, sessions, sttLanguage, onSttLanguageChange, responseEnabled = false, onResponseEnabledChange, onViewOnboarding,
+  open, onClose, sessions, sttLanguage, onSttLanguageChange, responseEnabled = false, onResponseEnabledChange, audioSource, onAudioSourceChange, onViewOnboarding,
 }: Props): React.JSX.Element {
   const [activeSection, setActiveSection] = useState<Section>("none");
   const [view, setView] = useState<PanelView>("menu");
@@ -125,22 +126,15 @@ export function ExpandPanel({
               </SidebarButton>
               <div style={activeSection === "settings" ? ACC_OPEN : ACC_CLOSED}>
                 <div className="px-3 py-2 text-xs text-muted font-sans leading-relaxed">
-                  <div className="flex flex-col gap-3">
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[10px] font-sans font-medium text-[#60594D]">Language</span>
-                      <Tabs value={sttLanguage === "zh" ? "cn" : sttLanguage === "en" ? "en" : "multi"} onValueChange={(v) => onSttLanguageChange(v === "cn" ? "zh" : v === "en" ? "en" : "zh+en")}>
-                        <TabsList><TabsTrigger value="multi">Multi</TabsTrigger><TabsTrigger value="cn">中文</TabsTrigger><TabsTrigger value="en">EN</TabsTrigger></TabsList>
-                      </Tabs>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[10px] font-sans font-medium text-[#60594D]">Source</span>
-                      <Tabs defaultValue="both"><TabsList><TabsTrigger value="both">Both</TabsTrigger><TabsTrigger value="mic">Mic</TabsTrigger><TabsTrigger value="internal">Internal</TabsTrigger></TabsList></Tabs>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[10px] font-sans font-medium text-[#60594D]">Response recommendation</span>
-                      <Tabs value={responseEnabled ? "on" : "off"} onValueChange={(v) => onResponseEnabledChange?.(v === "on")}><TabsList><TabsTrigger value="on">On</TabsTrigger><TabsTrigger value="off">Off</TabsTrigger></TabsList></Tabs>
-                    </div>
-                  </div>
+                  <SettingsControls
+                    variant="full"
+                    sttLanguage={sttLanguage}
+                    onSttLanguageChange={onSttLanguageChange}
+                    audioSource={audioSource}
+                    onAudioSourceChange={onAudioSourceChange}
+                    responseEnabled={responseEnabled}
+                    onResponseEnabledChange={onResponseEnabledChange}
+                  />
                 </div>
               </div>
               <SidebarButton active={activeSection === "about"} onClick={() => toggle("about")}>

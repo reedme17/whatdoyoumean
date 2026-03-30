@@ -226,6 +226,8 @@ export function setupWebSocketHandlers(
     socket.on("session:end", async () => {
       try {
         if (!state.sessionId) throw new Error("No active session");
+        console.log("[WS] session:end — emitting processing:progress");
+        emitServerEvent(socket, { type: "processing:progress", stage: "Wrapping up..." });
         // Cancel silence timer
         if (state.silenceTimer) {
           clearTimeout(state.silenceTimer);
@@ -239,6 +241,7 @@ export function setupWebSocketHandlers(
           await new Promise((r) => setTimeout(r, 600));
         }
         // Flush any pending text into a card before ending
+        emitServerEvent(socket, { type: "processing:progress", stage: "Finalizing..." });
         if (state.pendingText.trim()) {
           await finalizePendingText(
             socket, state,
@@ -248,7 +251,7 @@ export function setupWebSocketHandlers(
 
         // Final consolidation: full transcript review with marks
         if (state.transcripts.length >= 2) {
-          console.log("[WS] Final consolidation — reviewing all transcripts");
+          emitServerEvent(socket, { type: "processing:progress", stage: "Putting it together..." });
 
           // Group transcripts into sequential speaker runs (preserves time order)
           const runs: { speakerId: string; segments: TranscriptSegment[] }[] = [];
@@ -272,6 +275,9 @@ export function setupWebSocketHandlers(
               })
               .join("\n");
 
+            // Track if this run contains any marked text
+            const runHasMarked = run.segments.some((t) => state.markedTexts.has(t.text));
+
             if (!runText.trim()) continue;
 
             const langResult = state.languageDetector.detectFromText(runText);
@@ -282,29 +288,36 @@ export function setupWebSocketHandlers(
               card.speakerId = run.speakerId;
               // Use createdAt to preserve ordering
               card.createdAt = new Date(Date.now() + orderIdx++);
+              // If this run had marked text, highlight the first card from it
+              if (runHasMarked && !allFinalCards.some(c => c.isHighlighted)) {
+                card.isHighlighted = true;
+                console.log("[WS] Highlighted card from marked run:", card.content.slice(0, 50));
+              }
               allFinalCards.push(card);
             }
           }
 
-          // Dedup across all speakers
-          const seenContents: string[] = [];
+          // Dedup across all speakers — only merge if same category AND high word overlap
+          const seenItems: { content: string; category: string }[] = [];
           const dedupedFinal = allFinalCards.filter((card) => {
             const cardLower = card.content.toLowerCase();
             const cardWords = cardLower.split(/\s+/).filter(w => w.length > 2);
-            for (const seen of seenContents) {
-              const seenWords = seen.split(/\s+/).filter(w => w.length > 2);
+            for (const seen of seenItems) {
+              if (seen.category !== card.category) continue; // different intent = keep both
+              const seenWords = seen.content.split(/\s+/).filter(w => w.length > 2);
               if (seenWords.length === 0) continue;
               const overlap = cardWords.filter(w => seenWords.includes(w)).length;
               const ratio = overlap / Math.min(cardWords.length, seenWords.length);
               if (ratio > 0.6) return false;
             }
-            seenContents.push(cardLower);
+            seenItems.push({ content: cardLower, category: card.category });
             return true;
           });
 
-          // Inherit highlights
+          // Inherit highlights — fallback for cases where run-level marking didn't catch it
           const hadHighlight = state.cards.some(c => c.isHighlighted);
-          if (hadHighlight && dedupedFinal.length > 0) {
+          const alreadyHighlighted = dedupedFinal.some(c => c.isHighlighted);
+          if (hadHighlight && !alreadyHighlighted && dedupedFinal.length > 0) {
             const highlightedContents = state.cards.filter(c => c.isHighlighted).map(c => c.content.toLowerCase());
             let bestIdx = 0;
             let bestScore = -1;
@@ -334,6 +347,7 @@ export function setupWebSocketHandlers(
         state.consolidationVersion++;
         sessionManager.end(state.sessionId);
         state.transcriptionEngine.stopTranscription();
+        emitServerEvent(socket, { type: "processing:progress", stage: "Almost there..." });
         emitServerEvent(socket, { type: "session:state", state: "ended" });
         state.sessionId = null;
       } catch (err) {
@@ -478,6 +492,11 @@ export function setupWebSocketHandlers(
           console.log("[WS] Mark during pending — force finalizing");
           await finalizePendingText(socket, state, semanticAnalyzer, recommendationEngine, visualizationEngine);
           // markNextCard flag handled in processFinalTranscript
+        } else if (state.interimText.trim()) {
+          // Deepgram streaming path — interim text not yet finalized
+          state.markedTexts.add(state.interimText.trim());
+          state.markNextCard = true;
+          console.log("[WS] Mark during interim text:", state.interimText.slice(0, 50));
         } else {
           // No pending text — highlight the most recent existing card
           if (state.cards.length > 0) {
@@ -840,23 +859,23 @@ async function runConsolidation(
       return;
     }
 
-    // Deduplicate by word overlap (fuzzy — catches paraphrased duplicates)
-    const seenContents: string[] = [];
+    // Deduplicate — only merge if same category AND high word overlap
+    const seenItems: { content: string; category: string }[] = [];
     for (const lc of state.lockedCards) {
-      seenContents.push(lc.content.toLowerCase());
+      seenItems.push({ content: lc.content.toLowerCase(), category: lc.category });
     }
     const dedupedCards = windowCards.filter((card) => {
       const cardLower = card.content.toLowerCase();
       const cardWords = cardLower.split(/\s+/).filter(w => w.length > 2);
-      // Check against all seen contents for semantic overlap
-      for (const seen of seenContents) {
-        const seenWords = seen.split(/\s+/).filter(w => w.length > 2);
+      for (const seen of seenItems) {
+        if (seen.category !== card.category) continue; // different intent = keep both
+        const seenWords = seen.content.split(/\s+/).filter(w => w.length > 2);
         if (seenWords.length === 0) continue;
         const overlap = cardWords.filter(w => seenWords.includes(w)).length;
         const ratio = overlap / Math.min(cardWords.length, seenWords.length);
-        if (ratio > 0.6) return false; // >60% word overlap = duplicate
+        if (ratio > 0.6) return false; // same category + >60% word overlap = duplicate
       }
-      seenContents.push(cardLower);
+      seenItems.push({ content: cardLower, category: card.category });
       return true;
     });
 

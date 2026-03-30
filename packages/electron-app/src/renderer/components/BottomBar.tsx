@@ -10,7 +10,8 @@ import { Square } from "lucide-react";
 import { SlidersHorizontalIcon } from "./ui/sliders-icon.js";
 import { Popover, PopoverTrigger, PopoverContent } from "./ui/popover.js";
 import type { SttLanguage } from "./ExpandPanel.js";
-import { Tabs, TabsList, TabsTrigger } from "./ui/tabs.js";
+import type { AudioSourceMode } from "../hooks/useAudioCapture.js";
+import { SettingsControls } from "./SettingsControls.js";
 
 // Sequence: 0→1→2→3→pause(3s)→2→1→0→pause(3s), 0.5s per step
 const DOT_SEQUENCE = [0, 1, 2, 3, 3, 3, 3, 3, 3, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0];
@@ -40,10 +41,12 @@ interface Props {
   onSttLanguageChange?: (lang: SttLanguage) => void;
   responseEnabled?: boolean;
   onResponseEnabledChange?: (v: boolean) => void;
+  audioSource?: AudioSourceMode;
+  onAudioSourceChange?: (source: AudioSourceMode) => void;
   speakerName?: string;
 }
 
-export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false, pendingPreview = "", pendingTextRef, sttLanguage = "zh+en", onSttLanguageChange, responseEnabled = false, onResponseEnabledChange, speakerName }: Props): React.JSX.Element {
+export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false, pendingPreview = "", pendingTextRef, sttLanguage = "zh+en", onSttLanguageChange, responseEnabled = false, onResponseEnabledChange, audioSource = "mic", onAudioSourceChange, speakerName }: Props): React.JSX.Element {
   const outerRef = useRef<HTMLDivElement>(null);
   const pendingBlockRef = useRef<HTMLDivElement>(null);
   const [showMarked, setShowMarked] = useState(false);
@@ -193,6 +196,7 @@ export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false
           )}
           <button
             className="text-[#93918E] hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0"
+            style={{ transform: "translateY(2px)" }}
             onClick={() => {
               onFlag();
               setShowMarked(true);
@@ -217,37 +221,15 @@ export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false
               </button>
             </PopoverTrigger>
             <PopoverContent side="top" align="end" className="w-auto p-3">
-              <div className="flex flex-col gap-3">
-                <div className="flex flex-col gap-1">
-                  <span className="text-[10px] font-sans font-medium text-[#60594D]">Language</span>
-                  <Tabs value={sttLanguage === "zh" ? "cn" : sttLanguage === "en" ? "en" : "multi"} onValueChange={(v) => onSttLanguageChange?.(v === "cn" ? "zh" : v === "en" ? "en" : "zh+en")}>
-                    <TabsList>
-                      <TabsTrigger value="multi">Multi</TabsTrigger>
-                      <TabsTrigger value="cn">中文</TabsTrigger>
-                      <TabsTrigger value="en">EN</TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <span className="text-[10px] font-sans font-medium text-[#60594D]">Source</span>
-                  <Tabs defaultValue="both">
-                    <TabsList>
-                      <TabsTrigger value="both">Both</TabsTrigger>
-                      <TabsTrigger value="mic">Mic</TabsTrigger>
-                      <TabsTrigger value="internal">Internal</TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <span className="text-[10px] font-sans font-medium text-[#60594D]">Response recommendation</span>
-                  <Tabs value={responseEnabled ? "on" : "off"} onValueChange={(v) => onResponseEnabledChange?.(v === "on")}>
-                    <TabsList>
-                      <TabsTrigger value="on">On</TabsTrigger>
-                      <TabsTrigger value="off">Off</TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                </div>
-              </div>
+              <SettingsControls
+                variant="full"
+                sttLanguage={sttLanguage}
+                onSttLanguageChange={onSttLanguageChange}
+                audioSource={audioSource}
+                onAudioSourceChange={onAudioSourceChange}
+                responseEnabled={responseEnabled}
+                onResponseEnabledChange={onResponseEnabledChange}
+              />
             </PopoverContent>
           </Popover>
           <button

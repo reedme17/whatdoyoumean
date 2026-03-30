@@ -124,11 +124,15 @@ export class SemanticAnalyzer {
    */
   async analyzeMulti(text: string, languageCode: string): Promise<CoreMeaningCard[]> {
     console.log("[SemanticAnalyzer] analyzeMulti calling LLM...");
+    const hasMarked = text.includes("⭐IMPORTANT");
+    const userPrompt = hasMarked
+      ? `Analyze this text and extract all distinct points. Lines prefixed with ⭐IMPORTANT were explicitly marked by the user as critical — each MUST produce its own item and MUST NOT be dropped or merged away:\n\n${text}`
+      : `Analyze this text and extract all distinct points:\n\n${text}`;
     const response = await this.llm.complete({
       taskType: "semantic_analysis",
       messages: [
         { role: "system", content: MULTI_SYSTEM_PROMPT },
-        { role: "user", content: `Analyze this text and extract all distinct points:\n\n${text}` },
+        { role: "user", content: userPrompt },
       ],
       maxTokens: 1000,
       temperature: 0.3,
@@ -261,7 +265,7 @@ CRITICAL: The "content" field MUST be in the SAME LANGUAGE as the input text.
 CRITICAL: Merge related clauses into ONE item. Do NOT split on commas or conjunctions. Each item should represent a complete, self-contained idea — not a sentence fragment.
 CRITICAL: Do NOT produce duplicate or near-duplicate items. If two clauses express the same idea, merge them into one.
 CRITICAL: Strip any speaker tags like [speaker_0], [speaker_1], [user] etc. from the output content. These are metadata — do NOT include them in the "content" field.
-CRITICAL: The ⭐IMPORTANT annotation is metadata indicating user-marked moments. Preserve the meaning of marked content but do NOT include ⭐IMPORTANT in the output.
+CRITICAL: The ⭐IMPORTANT annotation is metadata indicating user-marked moments. These are the MOST IMPORTANT parts of the conversation — the user explicitly flagged them. You MUST create a dedicated item for each ⭐IMPORTANT section. NEVER merge, skip, or summarize away marked content. Do NOT include ⭐IMPORTANT in the output text.
 
 Respond ONLY with a valid JSON array. Each element has this format:
 {
@@ -274,7 +278,7 @@ CRITICAL: NO attribution or third person. Never use "I said," "I discussed," "Th
 
 Example: [{"content":"The meeting is at 3pm","category":"fact"},{"content":"We should cancel the project","category":"opinion"}]
 
-Return as many items as needed based on the text complexity. Short simple text = 1 item. Long text with multiple points = multiple items. Prefer fewer, richer items over many fragments.`;
+Return as many items as needed based on the text complexity. Short simple text = 1 item. Long text with multiple points = multiple items. Only merge items if they express the EXACT SAME intent and category. If two points have different intents or categories (e.g. a fact vs an opinion about the same topic), keep them as separate items even if they share similar wording.`;
 
 const DUPLICATE_SYSTEM_PROMPT = `You detect duplicate or rephrased points in a conversation. Given a new card and existing cards, determine if the new card duplicates an existing one.
 
