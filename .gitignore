@@ -5,3 +5,13 @@ dist/
 *.log
 *.tsbuildinfo
 .env
+
+# iOS / Xcode
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+DerivedData/
+*.ipa
+*.dSYM.zip
+*.dSYM
+.build/
+.swiftpm/
