@@ -88,35 +88,51 @@ struct AnimatedOnboardingSVG: UIViewRepresentable {
             savedAnims = {};
           }
 
+          /* Left person arms spin fast, right person arms drop to lowest position */
+          var spinAngle = 0;
+          var spinRAF = null;
+          var lastSpinTime = 0;
+
+          function startSpin() {
+            lastSpinTime = performance.now();
+            function tick(ts) {
+              var dt = ts - lastSpinTime;
+              lastSpinTime = ts;
+              spinAngle += dt * 0.5; /* ~180 deg per second */
+              /* Left person: right-arm1 and left-arm1 */
+              var el1 = getArmEl("right-arm1");
+              var el2 = getArmEl("left-arm1");
+              if (el1) setRotation(el1, spinAngle % 360, 482, 381);
+              if (el2) setRotation(el2, -(spinAngle % 360), 428, 384);
+              spinRAF = requestAnimationFrame(tick);
+            }
+            spinRAF = requestAnimationFrame(tick);
+          }
+
+          function stopSpin() {
+            if (spinRAF) { cancelAnimationFrame(spinRAF); spinRAF = null; }
+          }
+
           function onTouch(e) {
             e.preventDefault();
-            var touch = e.touches[0];
-            if (!touch) return;
-            var svg = document.querySelector("svg");
-            if (!svg) return;
-            var rect = svg.getBoundingClientRect();
-            var scaleX = 1408 / rect.width;
-            var scaleY = 768 / rect.height;
-            var mx = (touch.clientX - rect.left) * scaleX;
-            var my = (touch.clientY - rect.top) * scaleY;
-
             if (!interacting) {
               interacting = true;
               removeArmAnims();
+              /* Right person arms: drop to lowest position */
+              var r2 = getArmEl("right-arm2");
+              var l2 = getArmEl("left-arm2");
+              if (r2) setRotation(r2, 25, 1013, 381);  /* max = lowest */
+              if (l2) setRotation(l2, -25, 927, 383);  /* min = lowest */
+              /* Left person arms: start spinning */
+              startSpin();
             }
-
-            ARMS.forEach(function(a) {
-              var el = getArmEl(a.id);
-              if (!el) return;
-              var angle = Math.atan2(my - a.sy, mx - a.sx) * (180 / Math.PI);
-              var target = Math.max(a.min, Math.min(a.max, angle * 0.15));
-              setRotation(el, target, a.sx, a.sy);
-            });
           }
 
           function onTouchEnd() {
             if (!interacting) return;
-            var startTime = null;
+            stopSpin();
+
+            /* Capture current angles for spring-back */
             var startAngles = ARMS.map(function(a) {
               var el = getArmEl(a.id);
               if (!el) return a.rest;
@@ -124,6 +140,7 @@ struct AnimatedOnboardingSVG: UIViewRepresentable {
               var m = t.match(/rotate\\(([\\-\\d.]+)/);
               return m ? parseFloat(m[1]) : a.rest;
             });
+            var startTime = null;
 
             function animate(ts) {
               if (!startTime) startTime = ts;
