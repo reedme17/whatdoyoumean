@@ -73,11 +73,8 @@ struct AnimatedOnboardingSVG: UIViewRepresentable {
 
             if (!interacting) {
               interacting = true;
-              // Pause CSS animations
-              ARMS.forEach(function(a) {
-                var el = getArmEl(a.id);
-                if (el) el.style.animation = "none";
-              });
+              var s = document.querySelector("svg");
+              if (s) s.pauseAnimations();
             }
             if (returnTimer) { clearTimeout(returnTimer); returnTimer = null; }
 
