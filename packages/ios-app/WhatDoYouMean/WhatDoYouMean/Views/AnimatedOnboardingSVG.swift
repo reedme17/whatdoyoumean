@@ -92,14 +92,18 @@ struct AnimatedOnboardingSVG: UIViewRepresentable {
           var spinAngle = 0;
           var spinRAF = null;
           var lastSpinTime = 0;
+          var spinSpeed = 0; /* degrees per ms */
+          var MAX_SPIN = 1.44; /* 1440 deg/s = 4 rev/s */
 
           function startSpin() {
+            spinSpeed = 0;
             lastSpinTime = performance.now();
             function tick(ts) {
               var dt = ts - lastSpinTime;
               lastSpinTime = ts;
-              spinAngle += dt * 0.5; /* ~180 deg per second */
-              /* Left person: right-arm1 and left-arm1 */
+              /* Accelerate toward max speed */
+              spinSpeed = Math.min(MAX_SPIN, spinSpeed + dt * 0.002);
+              spinAngle += dt * spinSpeed;
               var el1 = getArmEl("right-arm1");
               var el2 = getArmEl("left-arm1");
               if (el1) setRotation(el1, spinAngle % 360, 482, 381);
@@ -111,6 +115,72 @@ struct AnimatedOnboardingSVG: UIViewRepresentable {
 
           function stopSpin() {
             if (spinRAF) { cancelAnimationFrame(spinRAF); spinRAF = null; }
+          }
+
+          /* Decelerate spin then spring-back to rest */
+          function decelAndRestore() {
+            var startTime = null;
+            var curSpeed = spinSpeed;
+            var decelDur = curSpeed / 0.003; /* ms to reach 0 */
+            if (decelDur < 100) decelDur = 100;
+
+            var allStartAngles = ARMS.map(function(a) {
+              var el = getArmEl(a.id);
+              if (!el) return a.rest;
+              var t = el.getAttribute("transform") || "";
+              var m = t.match(/rotate\\(([\\-\\d.]+)/);
+              return m ? parseFloat(m[1]) : a.rest;
+            });
+
+            function tick(ts) {
+              if (!startTime) startTime = ts;
+              var elapsed = ts - startTime;
+
+              if (elapsed < decelDur) {
+                /* Phase 1: decelerate spin */
+                var progress = elapsed / decelDur;
+                var speed = curSpeed * (1 - progress);
+                var dt = ts - lastSpinTime;
+                lastSpinTime = ts;
+                spinAngle += dt * speed;
+                var el1 = getArmEl("right-arm1");
+                var el2 = getArmEl("left-arm1");
+                if (el1) setRotation(el1, spinAngle % 360, 482, 381);
+                if (el2) setRotation(el2, -(spinAngle % 360), 428, 384);
+                requestAnimationFrame(tick);
+              } else {
+                /* Phase 2: spring-back all arms to rest */
+                /* Re-capture current angles after decel */
+                var snapAngles = ARMS.map(function(a) {
+                  var el = getArmEl(a.id);
+                  if (!el) return a.rest;
+                  var t = el.getAttribute("transform") || "";
+                  var m = t.match(/rotate\\(([\\-\\d.]+)/);
+                  return m ? parseFloat(m[1]) : a.rest;
+                });
+                var springStart = null;
+                function spring(ts2) {
+                  if (!springStart) springStart = ts2;
+                  var p = Math.min((ts2 - springStart) / 800, 1);
+                  var ease = 1 - Math.pow(2, -10 * p) * Math.cos(p * Math.PI * 3);
+                  ARMS.forEach(function(a, i) {
+                    var el = getArmEl(a.id);
+                    if (!el) return;
+                    var cur = snapAngles[i] + (a.rest - snapAngles[i]) * ease;
+                    setRotation(el, cur, a.sx, a.sy);
+                  });
+                  if (p < 1) {
+                    requestAnimationFrame(spring);
+                  } else {
+                    restoreArmAnims();
+                    interacting = false;
+                  }
+                }
+                requestAnimationFrame(spring);
+              }
+            }
+            lastSpinTime = performance.now();
+            requestAnimationFrame(tick);
           }
 
           function onTouch(e) {
@@ -131,35 +201,7 @@ struct AnimatedOnboardingSVG: UIViewRepresentable {
           function onTouchEnd() {
             if (!interacting) return;
             stopSpin();
-
-            /* Capture current angles for spring-back */
-            var startAngles = ARMS.map(function(a) {
-              var el = getArmEl(a.id);
-              if (!el) return a.rest;
-              var t = el.getAttribute("transform") || "";
-              var m = t.match(/rotate\\(([\\-\\d.]+)/);
-              return m ? parseFloat(m[1]) : a.rest;
-            });
-            var startTime = null;
-
-            function animate(ts) {
-              if (!startTime) startTime = ts;
-              var progress = Math.min((ts - startTime) / 800, 1);
-              var t = 1 - Math.pow(2, -10 * progress) * Math.cos(progress * Math.PI * 3);
-              ARMS.forEach(function(a, i) {
-                var el = getArmEl(a.id);
-                if (!el) return;
-                var current = startAngles[i] + (a.rest - startAngles[i]) * t;
-                setRotation(el, current, a.sx, a.sy);
-              });
-              if (progress < 1) {
-                requestAnimationFrame(animate);
-              } else {
-                restoreArmAnims();
-                interacting = false;
-              }
-            }
-            requestAnimationFrame(animate);
+            decelAndRestore();
           }
 
           document.addEventListener("touchstart", onTouch, { passive: false });
