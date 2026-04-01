@@ -93,7 +93,7 @@ struct AnimatedOnboardingSVG: UIViewRepresentable {
           var spinRAF = null;
           var lastSpinTime = 0;
           var spinSpeed = 0; /* degrees per ms */
-          var MAX_SPIN = 1.44; /* 1440 deg/s = 4 rev/s */
+          var MAX_SPIN = 2.16; /* 2160 deg/s = 6 rev/s */
 
           function startSpin() {
             spinSpeed = 0;
@@ -101,13 +101,13 @@ struct AnimatedOnboardingSVG: UIViewRepresentable {
             function tick(ts) {
               var dt = ts - lastSpinTime;
               lastSpinTime = ts;
-              /* Accelerate toward max speed */
-              spinSpeed = Math.min(MAX_SPIN, spinSpeed + dt * 0.002);
+              /* Faster acceleration */
+              spinSpeed = Math.min(MAX_SPIN, spinSpeed + dt * 0.005);
               spinAngle += dt * spinSpeed;
               var el1 = getArmEl("right-arm1");
               var el2 = getArmEl("left-arm1");
               if (el1) setRotation(el1, spinAngle % 360, 482, 381);
-              if (el2) setRotation(el2, -(spinAngle % 360), 428, 384);
+              if (el2) setRotation(el2, (spinAngle % 360), 428, 384);
               spinRAF = requestAnimationFrame(tick);
             }
             spinRAF = requestAnimationFrame(tick);
@@ -149,8 +149,7 @@ struct AnimatedOnboardingSVG: UIViewRepresentable {
                 if (el2) setRotation(el2, -(spinAngle % 360), 428, 384);
                 requestAnimationFrame(tick);
               } else {
-                /* Phase 2: spring-back all arms to rest */
-                /* Re-capture current angles after decel */
+                /* Phase 2: spring-back all arms to rest, then seamlessly restore SMIL */
                 var snapAngles = ARMS.map(function(a) {
                   var el = getArmEl(a.id);
                   if (!el) return a.rest;
@@ -172,8 +171,16 @@ struct AnimatedOnboardingSVG: UIViewRepresentable {
                   if (p < 1) {
                     requestAnimationFrame(spring);
                   } else {
-                    restoreArmAnims();
-                    interacting = false;
+                    /* Set exact rest transform so SMIL starts from correct position */
+                    ARMS.forEach(function(a) {
+                      var el = getArmEl(a.id);
+                      if (el) setRotation(el, a.rest, a.sx, a.sy);
+                    });
+                    /* Small delay to let the rest frame render before SMIL takes over */
+                    setTimeout(function() {
+                      restoreArmAnims();
+                      interacting = false;
+                    }, 16);
                   }
                 }
                 requestAnimationFrame(spring);
