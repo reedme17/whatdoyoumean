@@ -15,14 +15,10 @@ struct OnboardingScreen: View {
             VStack(spacing: Tokens.Spacing.xxl) {
                 Spacer()
 
-                Image("onboarding")
-                    .resizable()
-                    .renderingMode(.original)
-                    .aspectRatio(contentMode: .fit)
+                AnimatedOnboardingSVG()
+                    .aspectRatio(1408.0 / 768.0, contentMode: .fit)
 
-                Text("Hear meaning, not words, live.")
-                    .font(Tokens.Fonts.sans(size: Tokens.FontSize.sm))
-                    .foregroundStyle(Tokens.Colors.foreground)
+                CyclingSloganView()
 
                 // Enter button with position tracking
                 Button {
