@@ -36,16 +36,16 @@
       100% { transform: translateY(0); opacity: 1; }
     }
     /* Person 1 (left figure) arms — shoulder pivots at body connection */
-    #right-arm1 { animation: swingArm1 2.4s ease-in-out infinite; transform-origin: 482px 381px; }
-    #left-arm1  { animation: swingArm2 2.56s ease-in-out 0.3s infinite; transform-origin: 428px 384px; }
+    #right-arm1 { animation: swingArm1 2.4s ease-in-out infinite; transform-origin: 482 381; }
+    #left-arm1  { animation: swingArm2 2.56s ease-in-out 0.3s infinite; transform-origin: 428 384; }
     /* Person 2 (right figure) arms */
-    #right-arm2 { animation: swingArm3 2.4s ease-in-out 0.5s infinite; transform-origin: 1013px 381px; }
-    #left-arm2  { animation: swingArm4 2.56s ease-in-out 0.2s infinite; transform-origin: 927px 383px; }
+    #right-arm2 { animation: swingArm3 2.4s ease-in-out 0.5s infinite; transform-origin: 1013 381; }
+    #left-arm2  { animation: swingArm4 2.56s ease-in-out 0.2s infinite; transform-origin: 927 383; }
     /* Question mark wobble */
-    #question   { animation: wobble 2.5s ease-in-out infinite; transform-origin: 1045px 190px; }
+    #question   { animation: wobble 2.5s ease-in-out infinite; transform-origin: 1045 190; }
     /* Sweat drops dripping down */
-    #sweat1     { animation: drip1 3s ease-in-out infinite; transform-origin: 991px 270px; }
-    #sweat2     { animation: drip2 3.5s ease-in-out 0.5s infinite; transform-origin: 1005px 308px; }
+    #sweat1     { animation: drip1 3s ease-in-out infinite; transform-origin: 991 270; }
+    #sweat2     { animation: drip2 3.5s ease-in-out 0.5s infinite; transform-origin: 1005 308; }
   </style>
 <g id="Gemini_Generated_Image_2q5nub2q5nub2q5n(1) 2 [Vectorized]">
 <path id="right-arm1" fill-rule="evenodd" clip-rule="evenodd" d="M495.287 400.432C491.041 393.796 486.79 387.154 481.959 381.044L482.901 389.772C485.295 392.482 487.926 396.632 490.027 399.946C490.223 400.255 490.414 400.556 490.601 400.849C499.676 415.12 510.322 428.203 520.975 441.293C522.562 443.244 524.149 445.195 525.732 447.15C527.815 449.723 530.407 451.958 533.829 452.179C534.94 451.743 535.336 451.532 536.011 450.51C547.419 433.263 559.009 416.129 571.736 399.801C582.394 397.882 598.836 391.328 602.636 379.837C603.663 376.73 600.762 373.583 597.47 373.315C589.149 372.637 582.634 377.386 576.324 382.062C576.249 381.472 576.195 380.856 576.14 380.232C575.864 377.074 575.573 373.744 572.406 372.76C568.276 374.379 566.57 382.626 565.701 386.829C565.682 386.923 565.663 387.015 565.644 387.104C564.874 390.818 565.476 393.311 566.35 396.933L566.395 397.119C560.518 407.276 539.023 438.901 530.46 445.892C526.494 440.176 521.618 434.589 516.703 428.957C511.486 422.98 506.226 416.953 501.966 410.67C499.687 407.309 497.488 403.871 495.287 400.432ZM592.546 376.94C590.686 377.401 588.654 377.905 586.962 378.775C585.833 379.355 584.33 380.521 582.692 381.792C579.463 384.298 575.709 387.211 573.264 386.841C572.139 385.324 571.954 383.547 571.757 381.643C571.715 381.246 571.674 380.843 571.622 380.436L570.69 380.506C568.722 383.475 568.809 389.321 568.868 393.341C568.87 393.435 568.871 393.529 568.873 393.621C568.877 393.897 568.88 394.164 568.883 394.42L568.976 394.437C571.402 394.877 573.929 395.336 576.374 394.864C582.29 393.723 598.442 384.784 598.253 377.861C596.741 376.378 595.167 376.575 593.116 376.832C593.027 376.843 592.937 376.855 592.846 376.866C592.746 376.891 592.646 376.915 592.546 376.94Z" fill="black"/>
