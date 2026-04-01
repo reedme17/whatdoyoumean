@@ -51,7 +51,8 @@ struct AnimatedOnboardingSVG: UIViewRepresentable {
           ];
 
           let interacting = false;
-          let returnTimer = null;
+          /* Store removed animateTransform elements so we can re-insert them */
+          let savedAnims = {};
 
           function getArmEl(id) { return document.getElementById(id); }
 
@@ -59,24 +60,50 @@ struct AnimatedOnboardingSVG: UIViewRepresentable {
             el.setAttribute("transform", "rotate(" + angle + " " + sx + " " + sy + ")");
           }
 
+          /* Remove SMIL animateTransform from arm elements only */
+          function removeArmAnims() {
+            ARMS.forEach(function(a) {
+              var el = getArmEl(a.id);
+              if (!el) return;
+              var anim = el.querySelector("animateTransform");
+              if (anim) {
+                savedAnims[a.id] = { parent: el, node: anim };
+                el.removeChild(anim);
+              }
+              /* Clear any residual SMIL transform */
+              el.removeAttribute("transform");
+            });
+          }
+
+          /* Re-insert saved SMIL animateTransform elements */
+          function restoreArmAnims() {
+            Object.keys(savedAnims).forEach(function(id) {
+              var info = savedAnims[id];
+              if (info && info.parent && info.node) {
+                /* Reset transform before re-adding animation */
+                info.parent.removeAttribute("transform");
+                info.parent.appendChild(info.node);
+              }
+            });
+            savedAnims = {};
+          }
+
           function onTouch(e) {
             e.preventDefault();
-            const touch = e.touches[0];
+            var touch = e.touches[0];
             if (!touch) return;
-            const svg = document.querySelector("svg");
+            var svg = document.querySelector("svg");
             if (!svg) return;
-            const rect = svg.getBoundingClientRect();
-            const scaleX = 1408 / rect.width;
-            const scaleY = 768 / rect.height;
-            const mx = (touch.clientX - rect.left) * scaleX;
-            const my = (touch.clientY - rect.top) * scaleY;
+            var rect = svg.getBoundingClientRect();
+            var scaleX = 1408 / rect.width;
+            var scaleY = 768 / rect.height;
+            var mx = (touch.clientX - rect.left) * scaleX;
+            var my = (touch.clientY - rect.top) * scaleY;
 
             if (!interacting) {
               interacting = true;
-              var s = document.querySelector("svg");
-              if (s) s.pauseAnimations();
+              removeArmAnims();
             }
-            if (returnTimer) { clearTimeout(returnTimer); returnTimer = null; }
 
             ARMS.forEach(function(a) {
               var el = getArmEl(a.id);
@@ -89,7 +116,6 @@ struct AnimatedOnboardingSVG: UIViewRepresentable {
 
           function onTouchEnd() {
             if (!interacting) return;
-            // Spring back: animate to rest over 600ms
             var startTime = null;
             var startAngles = ARMS.map(function(a) {
               var el = getArmEl(a.id);
@@ -101,8 +127,7 @@ struct AnimatedOnboardingSVG: UIViewRepresentable {
 
             function animate(ts) {
               if (!startTime) startTime = ts;
-              var progress = Math.min((ts - startTime) / 600, 1);
-              // Elastic ease out approximation
+              var progress = Math.min((ts - startTime) / 800, 1);
               var t = 1 - Math.pow(2, -10 * progress) * Math.cos(progress * Math.PI * 3);
               ARMS.forEach(function(a, i) {
                 var el = getArmEl(a.id);
@@ -113,11 +138,7 @@ struct AnimatedOnboardingSVG: UIViewRepresentable {
               if (progress < 1) {
                 requestAnimationFrame(animate);
               } else {
-                // Resume CSS animations
-                ARMS.forEach(function(a) {
-                  var el = getArmEl(a.id);
-                  if (el) el.style.animation = "";
-                });
+                restoreArmAnims();
                 interacting = false;
               }
             }
