@@ -46,8 +46,10 @@ const VALID_CATEGORIES: MeaningCategory[] = [
   "opinion",
   "question",
   "decision",
-  "action_item",
+  "todo",
   "proposal",
+  "request",
+  "response",
 ];
 
 // ── SemanticAnalyzer ─────────────────────────────────────────────
@@ -247,10 +249,24 @@ CRITICAL: Write content as a DIRECT summary of what was said — NOT in third pe
 CRITICAL: NEVER use these phrases: "The speaker", "The person", "Appreciation is expressed", "It is stated", "One believes". Write as if quoting the actual point made. WRONG: "The speaker is upset" → RIGHT: "I'm upset about this". WRONG: "Appreciation is expressed" → RIGHT: "Thank you so much".
 CRITICAL: NO attribution or third person. Never use "I said," "I discussed," "The speaker mentioned," or "You are asking." Use DIRECT SPEECH — speak as if delivering the point right now. WRONG: "I am asking for clarification" or "You are asking for clarification" → RIGHT: "What exactly does this mean?"
 
+## Category Definitions
+
+- question: A request for information or clarification. Explicit ("What is...?") or implicit ("I'm wondering about..."). Must be seeking an answer.
+- fact: Objective statement of information, data, or how things work. Verifiable or descriptive of reality. No personal judgment.
+- opinion: Subjective judgment, evaluation, or personal viewpoint. Contains personal assessment. Often includes "I think", "I believe", "should", "seems".
+- request: Asking someone else to perform an action or provide help. Directed at another person, seeks action from others. "Could you please review this?" "Can you send me that link?"
+- todo: A concrete, actionable task with a specific action and (ideally) an assignee or deadline. Must be executable and specific with a clear action verb. "John will submit the report next week" ✓. "We should think about optimization" ✗ (that's a proposal).
+- decision: A finalized choice or determination that has been made. Uses definitive language: "decided", "confirmed", "will do". "We've decided to go with Option A" ✓. "We could try Option A" ✗ (that's a proposal).
+- proposal: A suggestion or recommendation not yet confirmed. Uses tentative language: "could", "suggest", "how about", "maybe". Not yet committed or decided.
+- response: Acknowledgment or confirmation of received information. Reactive to previous statement, confirms understanding. "Got it", "Understood", "Okay". If the response contains a concrete committed action, classify as todo instead.
+
+When uncertain between proposal and todo: proposal = exploratory/tentative, todo = concrete/committed.
+When uncertain between opinion and fact: opinion = personal judgment, fact = verifiable information.
+
 Respond ONLY with valid JSON in this exact format:
 {
   "content": "<core meaning in ≤30 English words or ≤50 Chinese characters>",
-  "category": "<one of: fact, opinion, question, decision, action_item, proposal>",
+  "category": "<one of: fact, opinion, question, decision, todo, proposal, request, response>",
   "linkType": "<one of: contradicts, modifies, extends, or null>",
   "linkedCardId": "<id of related card or null>",
   "topicName": "<short topic name>",
@@ -270,11 +286,13 @@ CRITICAL: The ⭐IMPORTANT annotation is metadata indicating user-marked moments
 Respond ONLY with a valid JSON array. Each element has this format:
 {
   "content": "<core meaning in ≤30 English words or ≤50 Chinese characters>",
-  "category": "<one of: fact, opinion, question, decision, action_item, proposal>"
+  "category": "<one of: fact, opinion, question, decision, todo, proposal, request, response>"
 }
 
 CRITICAL: Write content as a DIRECT summary — NOT in third person. NEVER use "The speaker", "The person", "It is stated", "Appreciation is expressed", or any passive/third-person phrasing. State the point directly as said. WRONG: "The speaker is upset" → RIGHT: "I'm upset about this". WRONG: "Appreciation is expressed" → RIGHT: "Thank you so much". WRONG: "The speaker disagrees" → RIGHT: "I disagree with that".
 CRITICAL: NO attribution or third person. Never use "I said," "I discussed," "The speaker mentioned," or "You are asking." Use DIRECT SPEECH — speak as if delivering the point right now. WRONG: "I am asking for clarification" or "You are asking for clarification" → RIGHT: "What exactly does this mean?"
+
+Category guide: question = seeking info; fact = verifiable/objective; opinion = subjective judgment; request = asking others to act; todo = concrete task with action verb (specific & committed); decision = finalized choice; proposal = tentative suggestion (not yet committed); response = acknowledgment (if it contains a concrete committed action, use todo instead).
 
 Example: [{"content":"The meeting is at 3pm","category":"fact"},{"content":"We should cancel the project","category":"opinion"}]
 

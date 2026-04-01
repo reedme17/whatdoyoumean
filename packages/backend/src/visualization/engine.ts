@@ -21,7 +21,7 @@ export interface RenderOutput {
  */
 const DIAGRAM_CATEGORIES: MeaningCategory[] = [
   "decision",
-  "action_item",
+  "todo",
   "proposal",
 ];
 
@@ -169,8 +169,10 @@ function formatCategory(category: MeaningCategory): string {
     opinion: "Opinion",
     question: "Question",
     decision: "Decision",
-    action_item: "Action",
+    todo: "To-do",
     proposal: "Proposal",
+    request: "Request",
+    response: "Response",
   };
   return labels[category] ?? category;
 }

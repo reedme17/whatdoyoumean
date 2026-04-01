@@ -29,6 +29,7 @@ export interface SessionSummary {
   recommendations?: Recommendation[];
   transcriptTexts?: string[];
   speakers?: Map<string, string>;
+  summary?: string;
 }
 
 function relativeTime(ts: number): string {
@@ -223,6 +224,11 @@ export function ExpandPanel({
                     />
                   </div>
                   <div className="flex flex-col gap-[10px] px-[20px]">
+                    {selectedSession.summary && (
+                      <div className="px-[20px] pt-[8px] pb-[8px]">
+                        <p className="font-sans font-medium text-sm text-[#60594D] leading-relaxed">{selectedSession.summary}</p>
+                      </div>
+                    )}
                     {(() => {
                       const sessionCards = selectedSession.cards ?? [];
                       const spk = selectedSession.speakers ?? new Map();

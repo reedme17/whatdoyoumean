@@ -137,8 +137,10 @@ describe("validateCategory", () => {
       "opinion",
       "question",
       "decision",
-      "action_item",
+      "todo",
       "proposal",
+      "request",
+      "response",
     ];
     for (const cat of categories) {
       expect(validateCategory(cat)).toBe(cat);
@@ -372,7 +374,7 @@ describe("SemanticAnalyzer", () => {
       const newCard = makeCard({
         id: "card-2",
         content: "Budget needs to be approved by finance",
-        category: "action_item",
+        category: "todo",
       });
 
       const result = await analyzer.detectDuplicate(newCard, [makeCard()]);

@@ -57,8 +57,8 @@ describe("VisualizationEngine", () => {
       expect(engine.selectFormat(makeCard({ category: "decision" }))).toBe("flow_diagram");
     });
 
-    it("returns flow_diagram for action_item", () => {
-      expect(engine.selectFormat(makeCard({ category: "action_item" }))).toBe("flow_diagram");
+    it("returns flow_diagram for todo", () => {
+      expect(engine.selectFormat(makeCard({ category: "todo" }))).toBe("flow_diagram");
     });
 
     it("returns flow_diagram for proposal", () => {

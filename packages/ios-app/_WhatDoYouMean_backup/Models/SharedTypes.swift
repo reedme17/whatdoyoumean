@@ -7,8 +7,10 @@ enum MeaningCategory: String, Codable, CaseIterable {
     case opinion
     case question
     case decision
-    case actionItem = "action_item"
+    case todo
     case proposal
+    case request
+    case response
 
     var label: String {
         switch self {
@@ -16,8 +18,10 @@ enum MeaningCategory: String, Codable, CaseIterable {
         case .opinion: return "Opinion"
         case .question: return "Question"
         case .decision: return "Decision"
-        case .actionItem: return "To do"
+        case .todo: return "To-do"
         case .proposal: return "Proposal"
+        case .request: return "Request"
+        case .response: return "Response"
         }
     }
 }

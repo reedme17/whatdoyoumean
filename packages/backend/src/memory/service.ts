@@ -31,7 +31,7 @@ export class ConversationMemoryService {
     const entries: MemoryEntry[] = [];
     const typesOfInterest: Record<string, MemoryEntry["type"]> = {
       decision: "decision",
-      action_item: "action_item",
+      todo: "todo",
       question: "unresolved_question",
     };
 
@@ -91,7 +91,7 @@ export class ConversationMemoryService {
       : [];
 
     const pendingActionItems = query.includeUnresolved
-      ? all.filter((e) => e.type === "action_item" && !e.isResolved)
+      ? all.filter((e) => e.type === "todo" && !e.isResolved)
       : [];
 
     // Count topic frequency for recurring topics
@@ -140,7 +140,7 @@ export class ConversationMemoryService {
       .map(([topic, count]) => ({ topic, count }));
 
     const trackedActionItems = entries
-      .filter((e) => e.type === "action_item")
+      .filter((e) => e.type === "todo")
       .map((e) => ({
         id: e.id,
         content: e.content,

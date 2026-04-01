@@ -6,7 +6,7 @@ export interface MemoryEntry {
   id: string;
   userId: string;
   sessionId: string;
-  type: 'intent' | 'decision' | 'action_item' | 'unresolved_question';
+  type: 'intent' | 'decision' | 'todo' | 'unresolved_question';
   content: string;
   speakerIds: string[];
   topics: string[];

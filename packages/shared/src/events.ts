@@ -48,4 +48,5 @@ export type ServerEvent =
   | { type: 'pending:preview'; text: string }
   | { type: 'error'; subsystem: string; message: string; recoverable: boolean }
   | { type: 'session:state'; state: 'active' | 'paused' | 'ended' }
-  | { type: 'processing:progress'; stage: string };
+  | { type: 'processing:progress'; stage: string }
+  | { type: 'session:summary'; summary: string };

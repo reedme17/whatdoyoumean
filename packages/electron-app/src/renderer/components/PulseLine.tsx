@@ -1,7 +1,7 @@
 /**
- * PulseLine — thin canvas line at top of BottomBar.
- * Reads AnalyserNode frequency data to create a subtle pulse effect.
- * Flat line when silent, gentle wave when speaking.
+ * PulseLine — wave edge overlay for BottomBar top.
+ * Peaks extend bar upward (bar color), troughs cut into bar (bg color).
+ * Placed in absolute container above BottomBar.
  */
 
 import React, { useRef, useEffect } from "react";
@@ -9,15 +9,15 @@ import React, { useRef, useEffect } from "react";
 interface Props {
   analyser: AnalyserNode | null;
   isCapturing: boolean;
-  color?: string;
-  height?: number;
+  barColor?: string;
+  bgColor?: string;
 }
 
 export function PulseLine({
   analyser,
   isCapturing,
-  color = "#D4D0CA",
-  height = 3,
+  barColor = "#F0EDE8",
+  bgColor = "#FAF8F5",
 }: Props): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number>(0);
@@ -28,19 +28,26 @@ export function PulseLine({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const w = canvas.width;
-    const h = canvas.height;
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+
+    const w = rect.width;
+    const h = rect.height;
     const midY = h / 2;
+    const amplitude = h / 2;
+    const inset = 24;
+
+    const drawFlat = () => {
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = barColor;
+      ctx.fillRect(0, midY, w, h - midY);
+    };
 
     if (!analyser || !isCapturing) {
-      // Flat line
-      ctx.clearRect(0, 0, w, h);
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(0, midY);
-      ctx.lineTo(w, midY);
-      ctx.stroke();
+      drawFlat();
       return;
     }
 
@@ -48,40 +55,58 @@ export function PulseLine({
 
     const draw = () => {
       analyser.getByteTimeDomainData(dataArray);
-
       ctx.clearRect(0, 0, w, h);
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
 
-      const sliceWidth = w / dataArray.length;
-      let x = 0;
+      ctx.fillStyle = barColor;
+      ctx.fillRect(0, midY, w, h - midY);
 
-      for (let i = 0; i < dataArray.length; i++) {
-        const v = dataArray[i] / 128.0; // 0-2 range, 1 = center
-        const y = midY + (v - 1) * h * 2; // amplify
+      const points = 80;
+      const step = Math.floor(dataArray.length / points);
 
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-        x += sliceWidth;
+      const wavePts: [number, number][] = [];
+      for (let i = 0; i <= points; i++) {
+        const t = i / points;
+        const x = t * w;
+        const idx = Math.min(i * step, dataArray.length - 1);
+        const v = (dataArray[idx] - 128) / 128;
+
+        let fade = 1;
+        if (x < inset) fade = x / inset;
+        else if (x > w - inset) fade = (w - x) / inset;
+
+        const y = midY + v * amplitude * 2 * fade;
+        wavePts.push([x, y]);
       }
 
-      ctx.stroke();
+      // Peaks: bar color above midY
+      ctx.fillStyle = barColor;
+      ctx.beginPath();
+      ctx.moveTo(0, midY);
+      for (const [x, y] of wavePts) ctx.lineTo(x, Math.min(y, midY));
+      ctx.lineTo(w, midY);
+      ctx.closePath();
+      ctx.fill();
+
+      // Troughs: bg color below midY
+      ctx.fillStyle = bgColor;
+      ctx.beginPath();
+      ctx.moveTo(0, midY);
+      for (const [x, y] of wavePts) ctx.lineTo(x, Math.max(y, midY));
+      ctx.lineTo(w, midY);
+      ctx.closePath();
+      ctx.fill();
+
       rafRef.current = requestAnimationFrame(draw);
     };
 
     draw();
-
     return () => cancelAnimationFrame(rafRef.current);
-  }, [analyser, isCapturing, color, height]);
+  }, [analyser, isCapturing, barColor, bgColor]);
 
   return (
     <canvas
       ref={canvasRef}
-      width={640}
-      height={height * 2}
-      className="w-full pointer-events-none"
-      style={{ height: height * 2 }}
+      className="w-full h-full pointer-events-none"
       aria-hidden="true"
     />
   );

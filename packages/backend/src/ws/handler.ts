@@ -348,6 +348,30 @@ export function setupWebSocketHandlers(
         sessionManager.end(state.sessionId);
         state.transcriptionEngine.stopTranscription();
         emitServerEvent(socket, { type: "processing:progress", stage: "Almost there..." });
+
+        // Generate session summary
+        if (state.cards.length > 0) {
+          try {
+            const cardsSummaryInput = state.cards.map((c) => `[${c.category}] ${c.content}`).join("\n");
+            const hasChinese = state.cards.some((c) => /[\u4e00-\u9fff]/.test(c.content));
+            const langHint = hasChinese ? "Respond in Chinese." : "Respond in English.";
+            const summaryResponse = await deps.llmGateway.complete({
+              taskType: "semantic_analysis",
+              messages: [
+                { role: "system", content: `You summarize conversations in 2-3 concise sentences. ${langHint} Be direct and factual. Do not use phrases like "The conversation covered..." — just state the key points.` },
+                { role: "user", content: `Summarize this conversation:\n${cardsSummaryInput}` },
+              ],
+              maxTokens: 200,
+              temperature: 0.3,
+              stream: false,
+              timeoutMs: 5000,
+            });
+            emitServerEvent(socket, { type: "session:summary", summary: summaryResponse.content.trim() });
+          } catch (err) {
+            console.error("[WS] Summary generation failed:", err);
+          }
+        }
+
         emitServerEvent(socket, { type: "session:state", state: "ended" });
         state.sessionId = null;
       } catch (err) {
@@ -422,6 +446,7 @@ export function setupWebSocketHandlers(
         processTextSubmit(
           socket, state, data.text,
           semanticAnalyzer, recommendationEngine, visualizationEngine,
+          deps.llmGateway,
         );
       } catch (err) {
         emitError(socket, "text", String(err), true);
@@ -1024,6 +1049,7 @@ async function processTextSubmit(
   analyzer: SemanticAnalyzer,
   recommender: RecommendationEngine,
   visualizer: VisualizationEngine,
+  llmGateway: LLMGateway,
 ): Promise<void> {
   try {
     console.log("[WS] processTextSubmit starting, text:", text.slice(0, 50));
@@ -1085,6 +1111,29 @@ async function processTextSubmit(
       });
       if (recs.length > 0) {
         emitServerEvent(socket, { type: "recommendation:new", recommendations: recs });
+      }
+    }
+
+    // Generate summary for text mode results
+    if (state.cards.length > 0) {
+      try {
+        const cardsSummaryInput = state.cards.map((c) => `[${c.category}] ${c.content}`).join("\n");
+        const hasChinese = state.cards.some((c) => /[\u4e00-\u9fff]/.test(c.content));
+        const langHint = hasChinese ? "Respond in Chinese." : "Respond in English.";
+        const summaryResponse = await llmGateway.complete({
+          taskType: "semantic_analysis",
+          messages: [
+            { role: "system", content: `You summarize text analysis results in 2-3 concise sentences. ${langHint} Be direct and factual. Do not use phrases like "The text covered..." — just state the key points.` },
+            { role: "user", content: `Summarize these analysis results:\n${cardsSummaryInput}` },
+          ],
+          maxTokens: 200,
+          temperature: 0.3,
+          stream: false,
+          timeoutMs: 5000,
+        });
+        emitServerEvent(socket, { type: "session:summary", summary: summaryResponse.content.trim() });
+      } catch (err) {
+        console.error("[WS] Text summary generation failed:", err);
       }
     }
   } catch (err) {

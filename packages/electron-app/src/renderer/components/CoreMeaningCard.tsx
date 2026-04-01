@@ -13,8 +13,10 @@ export const categoryLabels: Record<MeaningCategory, string> = {
   opinion: "Opinion",
   question: "Question",
   decision: "Decision",
-  action_item: "To do",
+  todo: "To-do",
   proposal: "Proposal",
+  request: "Request",
+  response: "Response",
 };
 
 interface Props {
@@ -136,8 +138,10 @@ export function computeBadgeWidth(cards: CardType[]): number {
     "Opinion": 38,
     "Question": 44,
     "Decision": 44,
-    "To do": 26,
+    "To-do": 28,
     "Proposal": 44,
+    "Request": 40,
+    "Response": 48,
   };
   let maxW = 0;
   const seen = new Set<string>();

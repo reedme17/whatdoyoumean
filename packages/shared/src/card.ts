@@ -7,8 +7,10 @@ export type MeaningCategory =
   | 'opinion'
   | 'question'
   | 'decision'
-  | 'action_item'
-  | 'proposal';
+  | 'todo'
+  | 'proposal'
+  | 'request'
+  | 'response';
 
 export type VisualizationFormat = 'concise_text' | 'flow_diagram';
 

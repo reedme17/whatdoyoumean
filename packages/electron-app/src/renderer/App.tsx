@@ -76,6 +76,10 @@ export function App(): React.JSX.Element {
   const [analyzing, setAnalyzing] = useState(false);
   const [processingStage, setProcessingStage] = useState("");
 
+  // ── Summary state ──
+  const [sessionSummary, setSessionSummary] = useState("");
+  const [textSummary, setTextSummary] = useState("");
+
   // ── Expand panel ──
   const [panelOpen, setPanelOpen] = useState(false);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
@@ -92,6 +96,8 @@ export function App(): React.JSX.Element {
   transcriptTextsRef.current = transcriptTexts;
   const speakersRef = useRef<Map<string, string>>(new Map());
   speakersRef.current = speakers;
+  const sessionSummaryRef = useRef("");
+  sessionSummaryRef.current = sessionSummary;
 
   // ── WebSocket ──
   // ── WebSocket ──
@@ -181,7 +187,7 @@ export function App(): React.JSX.Element {
                 // Nothing captured — remove the placeholder session
                 return prev.slice(1);
               }
-              const updated = { ...prev[0], cards: [...cardsRef.current], recommendations: [...recommendationsRef.current], transcriptTexts: [...transcriptTextsRef.current], speakers: new Map(speakersRef.current) };
+              const updated = { ...prev[0], cards: [...cardsRef.current], recommendations: [...recommendationsRef.current], transcriptTexts: [...transcriptTextsRef.current], speakers: new Map(speakersRef.current), summary: sessionSummaryRef.current };
               return [updated, ...prev.slice(1)];
             }
             return prev;
@@ -197,6 +203,12 @@ export function App(): React.JSX.Element {
       case "processing:progress":
         console.log("[App] processing:progress received:", (event as Extract<ServerEvent, { type: "processing:progress" }>).stage);
         setProcessingStage((event as Extract<ServerEvent, { type: "processing:progress" }>).stage);
+        break;
+
+      case "session:summary":
+        const summaryText = (event as Extract<ServerEvent, { type: "session:summary" }>).summary;
+        setSessionSummary(summaryText);
+        setTextSummary(summaryText);
         break;
 
       default:
@@ -238,12 +250,25 @@ export function App(): React.JSX.Element {
           cards: [...textCards],
           recommendations: [...textRecs],
           transcriptTexts: [...transcriptTexts],
+          summary: textSummary,
         },
         ...prev,
       ]);
     }
     prevTextCardsLen.current = textCards.length;
   }, [textCards.length]);
+
+  // Update most recent session's summary when it arrives (may come after initial save)
+  useEffect(() => {
+    if (!textSummary && !sessionSummary) return;
+    setSessions((prev) => {
+      if (prev.length === 0) return prev;
+      const latest = prev[0];
+      const newSummary = latest.mode === "text" ? textSummary : sessionSummary;
+      if (!newSummary || latest.summary === newSummary) return prev;
+      return [{ ...latest, summary: newSummary }, ...prev.slice(1)];
+    });
+  }, [textSummary, sessionSummary]);
 
   // ── Handlers ──
 
@@ -271,6 +296,8 @@ export function App(): React.JSX.Element {
     setPendingPreview("");
     setSpeakerName("");
     setSpeakers(new Map());
+    setSessionSummary("");
+    setTextSummary("");
   };
 
   const handleStart = async () => {
@@ -645,6 +672,7 @@ export function App(): React.JSX.Element {
           }}
           onEditCard={handleEditCard}
           speakerName={speakerName}
+          summary={sessionSummary}
           topRightContent={<DownloadPopover onCopy={handleExport} onExportMd={handleExportMd} />}
           onSpeakerRename={(key, name) => {
             setSpeakers((prev) => {
@@ -683,6 +711,7 @@ export function App(): React.JSX.Element {
           onToggleMark={(cardId) => {
             setTextCards((prev) => prev.map((c) => c.id === cardId ? { ...c, isHighlighted: !c.isHighlighted } : c));
           }}
+          summary={textSummary}
         />
         </div>
       )}

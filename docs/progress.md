@@ -1186,3 +1186,45 @@ All icons hand-drawn with SwiftUI `Canvas` using the same SVG paths as the Elect
 - `.gitignore` (iOS ignores)
 - `packages/ios-app/` (entire new package)
 - `docs/bug-report-button-morph-ios.md` (new)
+
+---
+
+## Phase 30: Onboarding SVG Animation + Interactive Arms + Cycling Slogans
+
+### Animated SVG Illustration
+- Restructured `onboarding-Vectorized.svg` with Figma-exported named IDs: `right-arm1`, `left-arm1`, `right-arm2`, `left-arm2`, `body1`, `body2`, `question`, `sweat1`, `sweat2`
+- Embedded CSS `@keyframes` animations directly in SVG `<style>` block:
+  - Arms: per-shoulder `rotate()` with `transform-origin` at shoulder coordinates, different durations/delays per arm for natural feel
+  - Question mark: ±5° wobble, 2.5s cycle
+  - Sweat drops: translateY downward + opacity fade out, then reset, 3–3.5s cycle
+- Left person arms: right-arm base -10° swing to -40°, left-arm base 0° swing to 10°
+- Right person arms: right-arm base 10° swing to 20°, left-arm base -10° swing to -20°
+- SVG synced to both Electron and iOS asset locations
+
+### Interactive Mouse-Driven Arms (Electron)
+- Switched from `<img>` to `<object>` tag to access SVG internal DOM via `contentDocument`
+- Transparent overlay div captures mouse events above the `<object>` element
+- On mousemove: calculates mouse position in SVG viewBox coordinates, computes angle from each shoulder pivot, maps to constrained rotation range
+- GSAP `svgOrigin` (not `transformOrigin`) for correct SVG coordinate system rotation
+- On mouseleave: elastic spring-back to rest position (`elastic.out(1, 0.3)`, 1.2s)
+- Idle animation: GSAP Timeline yoyo loop replaces CSS animations (avoids transform-origin coordinate system mismatch between CSS px units and SVG viewBox)
+- Interaction flow: idle GSAP loop → mouse enters → kill idle, GSAP tracks mouse → mouse leaves → elastic return → restart idle loop
+
+### Responsive Scaling
+- Image container width: `min(90vw, 92vh)` — scales with the smaller viewport dimension, no max cap
+- Image height approximately 50% of screen height
+
+### Cycling Slogans
+- Two slogans cycle with per-character blur animation (matching BottomBar pendingText style):
+  1. "Hear meaning, not words, live."
+  2. "Words land differently in every ear. Let's close the gap!"
+- Each character wrapped in `<span data-sc>`, animated with GSAP stagger
+- Enter: blur(6px)→blur(0px) + opacity 0→1, 0.5s, stagger 0.02s
+- Hold: 2 seconds
+- Exit: blur(0px)→blur(6px) + opacity 1→0, 0.5s, stagger 0.015s
+- Loops infinitely between the two slogans
+
+### Changed Files
+- `packages/electron-app/src/renderer/assets/onboarding-Vectorized.svg` (restructured with IDs + CSS animations)
+- `packages/ios-app/.../onboarding-Vectorized.svg` (synced copy)
+- `packages/electron-app/src/renderer/components/Onboarding.tsx` (interactive arms, object tag, cycling slogans, responsive sizing)

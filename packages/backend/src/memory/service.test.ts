@@ -21,7 +21,7 @@ function makeArchive(): SessionArchive {
         isHighlighted: false, createdAt: new Date(), updatedAt: new Date(),
       },
       {
-        id: "c2", sessionId: "s1", category: "action_item",
+        id: "c2", sessionId: "s1", category: "todo",
         content: "Set up CI pipeline",
         sourceSegmentIds: [], linkedCardIds: [], linkType: null,
         topicId: "t1", visualizationFormat: "concise_text",
@@ -63,9 +63,9 @@ describe("ConversationMemoryService", () => {
 
   it("extracts memory from session archive", () => {
     const entries = svc.extractMemory("u1", makeArchive());
-    // Should extract decision, action_item, and question (not fact)
+    // Should extract decision, todo, and question (not fact)
     expect(entries).toHaveLength(3);
-    expect(entries.map((e) => e.type).sort()).toEqual(["action_item", "decision", "unresolved_question"]);
+    expect(entries.map((e) => e.type).sort()).toEqual(["decision", "todo", "unresolved_question"]);
   });
 
   it("stores extracted entries and retrieves them", () => {

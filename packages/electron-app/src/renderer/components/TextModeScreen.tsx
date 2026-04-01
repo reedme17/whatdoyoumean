@@ -25,6 +25,7 @@ interface Props {
   responseEnabled?: boolean;
   onResponseEnabledChange?: (v: boolean) => void;
   onToggleMark?: (cardId: string) => void;
+  summary?: string;
 }
 
 export function TextModeScreen({
@@ -38,6 +39,7 @@ export function TextModeScreen({
   onExportMd,
   onResponseEnabledChange,
   onToggleMark,
+  summary,
 }: Props): React.JSX.Element {
   const [text, setText] = useState("");
   const hasResults = cards.length > 0;
@@ -64,6 +66,7 @@ export function TextModeScreen({
         actionLabel="Analyze another"
         showSpeakers={false}
         responseEnabled={responseEnabled}
+        summary={summary}
         topRightContent={
           <div className="flex items-center gap-4">
             <button className="text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0" onClick={() => onReset?.()} title="Edit input"><FeatherIcon size={18} /></button>
@@ -107,7 +110,7 @@ export function TextModeScreen({
         <div className="flex items-center gap-4">
           <Popover>
             <PopoverTrigger asChild>
-              <button className="text-[#93918E] hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0" title="Settings" aria-label="Settings">
+              <button className="text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0" title="Settings" aria-label="Settings">
                 <SlidersHorizontalIcon size={18} />
               </button>
             </PopoverTrigger>
