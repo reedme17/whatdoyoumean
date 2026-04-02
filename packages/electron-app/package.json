@@ -20,7 +20,13 @@
       "target": [
         "dmg"
       ],
-      "icon": "src/renderer/assets/WDYM.icon/Assets/icon.png"
+      "icon": "src/renderer/assets/WDYM.icon/Assets/icon.png",
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "啥意思 needs microphone access to capture and transcribe conversations in real time.",
+        "NSScreenCaptureUsageDescription": "啥意思 needs screen recording access to capture system audio."
+      }
     },
     "dmg": {
       "title": "啥意思",

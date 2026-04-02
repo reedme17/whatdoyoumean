@@ -15,7 +15,6 @@ import { setupWebSocketHandlers } from "./ws/handler.js";
 
 const PORT = parseInt(process.env.PORT ?? "3000", 10);
 const HOST = process.env.HOST ?? "0.0.0.0";
-const WS_PORT = parseInt(process.env.WS_PORT ?? "3001", 10);
 
 async function main() {
   // Initialize LLM Gateway
@@ -29,17 +28,17 @@ async function main() {
     process.env.OPENAI_API_KEY ? "✅ OpenAI" : "❌ OpenAI (no key)",
   );
 
-  // Start Fastify REST API on port 3000
+  // Start Fastify REST API
   const app = await buildApp();
   const address = await app.listen({ port: PORT, host: HOST });
   console.log(`🚀 REST API listening at ${address}`);
 
-  // Start Socket.IO on a separate port (3001)
-  const io = new SocketIOServer(WS_PORT, {
+  // Attach Socket.IO to the same HTTP server
+  const io = new SocketIOServer(app.server, {
     cors: { origin: "*" },
   });
   setupWebSocketHandlers(io, { llmGateway: gateway });
-  console.log(`🔌 WebSocket server listening on port ${WS_PORT}`);
+  console.log(`🔌 WebSocket server attached on same port ${PORT}`);
 }
 
 main();

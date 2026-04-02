@@ -7,7 +7,7 @@ import { useEffect, useRef, useCallback, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import type { ServerEvent } from "@wdym/shared";
 
-const WS_URL = "http://localhost:3001";
+const WS_URL = (window as any).__WDYM_BACKEND_URL__ || "http://localhost:3000";
 
 export type ServerEventHandler = (event: ServerEvent) => void;
 

@@ -43,8 +43,9 @@ declare global {
 
 export function App(): React.JSX.Element {
   // ── Navigation state ──
-  const [screen, setScreen] = useState<Screen>("onboarding");
-  const screenRef = useRef<Screen>("onboarding");
+  const hasSeenOnboarding = localStorage.getItem("wdym:onboarded") === "true";
+  const [screen, setScreen] = useState<Screen>(hasSeenOnboarding ? "home" : "onboarding");
+  const screenRef = useRef<Screen>(hasSeenOnboarding ? "home" : "onboarding");
   const screenKeyRef = useRef(0);
   const [userId, setUserId] = useState<string | null>(null);
   const isGuest = userId === null;
@@ -593,7 +594,10 @@ export function App(): React.JSX.Element {
   return (
     <div className="w-full h-full relative">
       {screen === "onboarding" && (
-        <Onboarding onComplete={() => goToScreen("home")} />
+        <Onboarding onComplete={() => {
+          localStorage.setItem("wdym:onboarded", "true");
+          goToScreen("home");
+        }} />
       )}
 
       {screen === "home" && (
