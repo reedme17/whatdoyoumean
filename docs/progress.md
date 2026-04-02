@@ -1228,3 +1228,48 @@ All icons hand-drawn with SwiftUI `Canvas` using the same SVG paths as the Elect
 - `packages/electron-app/src/renderer/assets/onboarding-Vectorized.svg` (restructured with IDs + CSS animations)
 - `packages/ios-app/.../onboarding-Vectorized.svg` (synced copy)
 - `packages/electron-app/src/renderer/components/Onboarding.tsx` (interactive arms, object tag, cycling slogans, responsive sizing)
+
+---
+
+## Phase 33: Electron App Packaging + Cloud Deployment
+
+### macOS DMG Packaging
+- Installed `electron-builder` for macOS dmg packaging
+- Configured `package.json` build section: appId `com.wdym.app`, productName `啥意思`, dmg target
+- App icon: created from custom design via Icon Composer, flattened PNG transparency to white background
+- Added `entitlements.mac.plist` with `com.apple.security.device.audio-input` for microphone access
+- Added `NSMicrophoneUsageDescription` via `extendInfo` in electron-builder config
+- DevTools disabled in packaged builds via `app.isPackaged` check
+- Electron version pinned to `33.4.11`
+- `release/` directory added to `.gitignore` (dmg too large for GitHub)
+
+### Onboarding First-Launch Only
+- Onboarding screen now only shows on first app launch
+- Uses `localStorage.getItem("wdym:onboarded")` to track completion
+- ExpandPanel "View Onboarding" button still allows manual re-viewing
+
+### Backend Cloud Deployment (Render)
+- Merged Socket.IO onto Fastify HTTP server (single port) — required for cloud hosting
+- Created `Dockerfile` for deployment: node:22-slim, public npm registry, builds shared + backend
+- Deployed to Render at `https://whatdoyoumean.onrender.com`
+- Environment variables (CEREBRAS_API_KEY, GROQ_API_KEY, DEEPGRAM_API_KEY) set in Render dashboard
+- Fixed `import.meta.url` → `process.cwd()` for dotenv path (CommonJS compatibility)
+- Added `.npmrc` to force public npm registry (bypasses Amazon CodeArtifact in lockfile)
+- Replaced all CodeArtifact URLs in `package-lock.json` with `registry.npmjs.org`
+
+### Frontend WebSocket URL
+- `useSocket.ts` WS_URL changed from `localhost:3001` to `https://whatdoyoumean.onrender.com`
+- Supports override via `window.__WDYM_BACKEND_URL__` for local development
+
+### Key Configuration
+- Backend REST + WS: `https://whatdoyoumean.onrender.com` (production)
+- Backend REST + WS: `http://localhost:3000` (local dev, override via `window.__WDYM_BACKEND_URL__`)
+- Render free tier: auto-sleeps after 15min inactivity, ~30-60s cold start
+
+### Changed Files
+- `packages/electron-app/package.json` (electron-builder config, scripts, entitlements)
+- `packages/electron-app/src/main/index.ts` (DevTools guard, microphone permission)
+- `packages/electron-app/src/renderer/App.tsx` (onboarding localStorage)
+- `packages/electron-app/src/renderer/hooks/useSocket.ts` (WS_URL)
+- `packages/backend/src/index.ts` (single-port, dotenv fix)
+- `Dockerfile`, `railway.json`, `.npmrc`, `.gitignore`
