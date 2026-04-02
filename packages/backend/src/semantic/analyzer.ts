@@ -124,7 +124,7 @@ export class SemanticAnalyzer {
    * Detect whether a new card duplicates an existing one.
    * Returns a MergeDecision indicating whether to merge and into which card.
    */
-  async analyzeMulti(text: string, languageCode: string): Promise<CoreMeaningCard[]> {
+  async analyzeMulti(text: string, languageCode: "zh" | "en"): Promise<CoreMeaningCard[]> {
     console.log("[SemanticAnalyzer] analyzeMulti calling LLM...");
     const hasMarked = text.includes("⭐IMPORTANT");
     const userPrompt = hasMarked
@@ -154,10 +154,11 @@ export class SemanticAnalyzer {
         content: enforceContentLimit(item.content || text.slice(0, 50), languageCode),
         category: validateCategory(item.category),
         sourceSegmentIds: [],
-        linkedCardId: null,
+        linkedCardIds: [],
         linkType: null,
-        topicId: null,
-        visualizationType: "concise_text" as const,
+        topicId: "",
+        visualizationFormat: "concise_text" as const,
+        isHighlighted: false,
         createdAt: new Date(),
         updatedAt: new Date(),
       }));
@@ -171,10 +172,11 @@ export class SemanticAnalyzer {
         content: text.slice(0, 100),
         category: "fact",
         sourceSegmentIds: [],
-        linkedCardId: null,
+        linkedCardIds: [],
         linkType: null,
-        topicId: null,
-        visualizationType: "concise_text" as const,
+        topicId: "",
+        visualizationFormat: "concise_text" as const,
+        isHighlighted: false,
         createdAt: new Date(),
         updatedAt: new Date(),
       }];
