@@ -5,10 +5,12 @@ WORKDIR /app
 # Force public npm registry
 RUN npm config set registry https://registry.npmjs.org/
 
-# Copy package files
-COPY package.json package-lock.json .npmrc ./
+# Copy package files and tsconfig
+COPY package.json package-lock.json .npmrc tsconfig.base.json ./
 COPY packages/shared/package.json packages/shared/
+COPY packages/shared/tsconfig.json packages/shared/
 COPY packages/backend/package.json packages/backend/
+COPY packages/backend/tsconfig.json packages/backend/
 COPY packages/electron-app/package.json packages/electron-app/
 
 # Install dependencies
