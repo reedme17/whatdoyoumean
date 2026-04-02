@@ -1,0 +1,12 @@
+{
+  "build": {
+    "builder": "NIXPACKS",
+    "buildCommand": "npm config set registry https://registry.npmjs.org/ && npm ci && npm run build:shared && npm run build:backend"
+  },
+  "deploy": {
+    "startCommand": "node packages/backend/dist/index.js",
+    "healthcheckPath": "/api/health",
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
+  }
+}
