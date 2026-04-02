@@ -1,12 +1,48 @@
 {
   "name": "@wdym/electron-app",
   "version": "0.1.0",
+  "description": "啥意思 — real-time conversation understanding tool",
+  "author": "wdym",
   "private": true,
   "main": "./dist/main/index.js",
   "scripts": {
     "build": "tsc --build tsconfig.main.json && node build-renderer.mjs && cp src/renderer/index.html dist/renderer/index.html",
     "clean": "rm -rf dist tsconfig.tsbuildinfo tsconfig.main.tsbuildinfo tsconfig.renderer.tsbuildinfo",
-    "start": "electron ./dist/main/index.js"
+    "start": "electron ./dist/main/index.js",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "build": {
+    "appId": "com.wdym.app",
+    "productName": "啥意思",
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        "dmg"
+      ],
+      "icon": "src/renderer/assets/WDYM.icon/Assets/icon.png"
+    },
+    "dmg": {
+      "title": "啥意思",
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*"
+    ]
   },
   "dependencies": {
     "@radix-ui/react-popover": "^1.1.15",
@@ -27,7 +63,8 @@
     "@types/node": "^22.15.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
-    "electron": "^33.0.0",
+    "electron": "33.4.11",
+    "electron-builder": "^26.8.1",
     "esbuild": "^0.27.4",
     "tailwindcss": "^4.2.2",
     "typescript": "^5.8.3"

@@ -36,8 +36,10 @@ function createWindow(): void {
   const rendererPath = path.join(__dirname, "..", "renderer", "index.html");
   mainWindow.loadFile(rendererPath);
 
-  // Open DevTools in development
-  mainWindow.webContents.openDevTools({ mode: "detach" });
+  // Open DevTools only in development
+  if (!app.isPackaged) {
+    mainWindow.webContents.openDevTools({ mode: "detach" });
+  }
 
   mainWindow.on("closed", () => {
     mainWindow = null;

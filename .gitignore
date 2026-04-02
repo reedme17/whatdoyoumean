@@ -15,3 +15,6 @@ DerivedData/
 *.dSYM
 .build/
 .swiftpm/
+
+# Electron builder intermediate output
+**/release/
