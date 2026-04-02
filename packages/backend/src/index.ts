@@ -1,10 +1,8 @@
 import { config } from "dotenv";
-import { resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 
-// Load .env from project root
-const __dirname = dirname(fileURLToPath(import.meta.url));
-config({ path: resolve(__dirname, "../../../.env") });
+// Load .env from project root (local dev only; on server, env vars are set directly)
+config({ path: resolve(process.cwd(), ".env") });
 
 import { buildApp, setGateway } from "./app.js";
 import { LLMGateway } from "./llm/gateway.js";
