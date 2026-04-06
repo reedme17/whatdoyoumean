@@ -2,7 +2,11 @@ import { config } from "dotenv";
 import { resolve } from "node:path";
 
 // Load .env from project root (local dev only; on server, env vars are set directly)
-config({ path: resolve(process.cwd(), ".env") });
+// Try cwd first, then walk up to find root .env (handles running from packages/backend/)
+const cwdEnv = resolve(process.cwd(), ".env");
+const rootEnv = resolve(process.cwd(), "../../.env");
+config({ path: cwdEnv });
+config({ path: rootEnv }); // won't override existing vars, just fills in missing ones
 
 import { buildApp, setGateway } from "./app.js";
 import { LLMGateway } from "./llm/gateway.js";

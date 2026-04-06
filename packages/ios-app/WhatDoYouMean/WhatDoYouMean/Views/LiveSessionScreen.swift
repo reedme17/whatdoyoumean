@@ -4,6 +4,7 @@ import SwiftUI
 /// Shows cards grouped by speaker, with bottom bar controls.
 struct LiveSessionScreen: View {
     @Environment(AppState.self) private var appState
+    @Environment(SessionCoordinator.self) private var coordinator
 
     var body: some View {
         VStack(spacing: 0) {
@@ -29,10 +30,12 @@ struct LiveSessionScreen: View {
                 }
             }
 
-            // Pending preview text
-            if !appState.pendingPreview.isEmpty {
-                PendingPreviewBar(text: appState.pendingPreview)
-            }
+            // Waveform above bottom bar
+            WaveformView(
+                samples: coordinator.audio.waveformSamples,
+                isCapturing: coordinator.audio.isCapturing
+            )
+            .padding(.horizontal, Tokens.Spacing.xl)
 
             // Bottom bar
             BottomBarView()
@@ -69,11 +72,16 @@ struct SpeakerGroup: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Spacing.sm) {
             Text(group.speakerName)
-                .font(.system(size: Tokens.FontSize.sm, weight: .semibold))
+                .font(Tokens.Fonts.sans(size: Tokens.FontSize.sm, weight: .semibold))
                 .foregroundStyle(Tokens.Colors.warmText)
 
-            ForEach(group.cards) { card in
-                CoreMeaningCardRow(card: card)
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(Array(group.cards.enumerated()), id: \.element.id) { index, card in
+                    if index > 0 {
+                        Divider()
+                    }
+                    CoreMeaningCardRow(card: card)
+                }
             }
         }
         .padding(.horizontal, Tokens.Spacing.xl)

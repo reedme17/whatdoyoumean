@@ -12,7 +12,7 @@ export class CerebrasAdapter extends OpenAICompatibleAdapter {
       name: "Cerebras GPT-OSS-120B",
       apiKeyEnvVar: "CEREBRAS_API_KEY",
       baseURL: "https://api.cerebras.ai/v1",
-      model: "llama3.1-8b",
+      model: "qwen-3-235b-a22b-instruct-2507",
     });
   }
 }

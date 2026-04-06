@@ -13,17 +13,14 @@ class AppState {
     var isCapturing: Bool = false
     var connected: Bool = false
 
-    // Onboarding
-    var hasCompletedOnboarding: Bool = false
-
     // Side panel
     var showSidePanel: Bool = false
-    var requestOnboarding: Bool = false
 
     // Settings
-    var sttLanguage: SttLanguage = .zhEn
-    var responseEnabled: Bool = false
+    var sttLanguage: SttLanguage = .en
+    var responseEnabled: Bool = true
     var audioSource: AudioSourceMode = .mic
+    var processingMode: ProcessingMode = .local
 
     // History
     var sessionHistory: [SessionHistoryItem] = []

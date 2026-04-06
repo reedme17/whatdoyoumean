@@ -9,13 +9,13 @@ struct CoreMeaningCardRow: View {
         HStack(alignment: .firstTextBaseline, spacing: Tokens.Spacing.sm) {
             // Category label — italic 11px
             Text(card.category.label)
-                .font(.system(size: 11).italic())
+                .font(Tokens.Fonts.sans(size: 11, weight: .regular).italic())
                 .foregroundStyle(Tokens.Colors.warmText)
-                .frame(width: 48, alignment: .leading)
+                .frame(width: 60, alignment: .leading)
 
             // Content — medium 14px
             Text(card.content)
-                .font(.system(size: Tokens.FontSize.sm, weight: .medium))
+                .font(Tokens.Fonts.sans(size: Tokens.FontSize.sm, weight: .medium))
                 .foregroundStyle(Tokens.Colors.warmText)
                 .background(
                     card.isHighlighted

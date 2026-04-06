@@ -7,8 +7,9 @@ import SwiftUI
 
 struct MenuIcon: View {
     let size: CGFloat
+    var color: Color = Tokens.Colors.muted
 
-    init(size: CGFloat = 20) { self.size = size }
+    init(size: CGFloat = 20, color: Color = Tokens.Colors.muted) { self.size = size; self.color = color }
 
     var body: some View {
         Canvas { context, canvasSize in
@@ -20,7 +21,7 @@ struct MenuIcon: View {
             path.addLine(to: CGPoint(x: 20 * scale, y: 12 * scale))
             path.move(to: CGPoint(x: 4 * scale, y: 18 * scale))
             path.addLine(to: CGPoint(x: 20 * scale, y: 18 * scale))
-            context.stroke(path, with: .color(Tokens.Colors.warmText),
+            context.stroke(path, with: .color(color),
                            style: StrokeStyle(lineWidth: 2 * scale, lineCap: .round, lineJoin: .round))
         }
         .frame(width: size, height: size)
@@ -31,8 +32,9 @@ struct MenuIcon: View {
 
 struct XIcon: View {
     let size: CGFloat
+    var color: Color = Tokens.Colors.warmText
 
-    init(size: CGFloat = 20) { self.size = size }
+    init(size: CGFloat = 20, color: Color = Tokens.Colors.warmText) { self.size = size; self.color = color }
 
     var body: some View {
         Canvas { context, canvasSize in
@@ -42,7 +44,7 @@ struct XIcon: View {
             path.addLine(to: CGPoint(x: 6 * scale, y: 18 * scale))
             path.move(to: CGPoint(x: 6 * scale, y: 6 * scale))
             path.addLine(to: CGPoint(x: 18 * scale, y: 18 * scale))
-            context.stroke(path, with: .color(Tokens.Colors.warmText),
+            context.stroke(path, with: .color(color),
                            style: StrokeStyle(lineWidth: 2 * scale, lineCap: .round, lineJoin: .round))
         }
         .frame(width: size, height: size)

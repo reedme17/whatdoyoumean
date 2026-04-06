@@ -52,14 +52,6 @@ struct SidePanel: View {
                     .padding(.vertical, Tokens.Spacing.sm)
             }
 
-            sidebarButton("View onboarding") {
-                isPresented = false
-                // Delay to let sheet dismiss animation finish, then go to onboarding
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    appState.requestOnboarding = true
-                }
-            }
-
         }
         .padding(.horizontal, Tokens.Spacing.sm)
         .padding(.top, Tokens.Spacing.xxl)

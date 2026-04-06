@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsControls: View {
     @Environment(AppState.self) private var appState
+    @Environment(SessionCoordinator.self) private var coordinator
     var variant: Variant = .full
 
     enum Variant { case full, responseOnly }
@@ -17,7 +18,12 @@ struct SettingsControls: View {
                         id: "lang",
                         options: [("en", "EN"), ("zh", "中文"), ("zh+en", "Multi")],
                         selected: appState.sttLanguage.rawValue,
-                        onSelect: { v in if let l = SttLanguage(rawValue: v) { appState.sttLanguage = l } }
+                        onSelect: { v in
+                            if let l = SttLanguage(rawValue: v) {
+                                appState.sttLanguage = l
+                                coordinator.sendSettingsUpdate()
+                            }
+                        }
                     )
                 }
 
@@ -33,6 +39,28 @@ struct SettingsControls: View {
                         onSelect: { v in if let s = AudioSourceMode(rawValue: v) { appState.audioSource = s } }
                     )
                 }
+
+                VStack(alignment: .leading, spacing: Tokens.Spacing.xs) {
+                    Text("Processing mode")
+                        .font(Tokens.Fonts.sans(size: 10, weight: .medium))
+                        .foregroundStyle(Tokens.Colors.warmText)
+                    PillTabs(
+                        id: "proc",
+                        options: [("local", "Local"), ("cloud", "Cloud"), ("fusion", "Fusion")],
+                        selected: appState.processingMode.rawValue,
+                        disabled: !coordinator.onDeviceAI.isAvailable ? ["local", "fusion"] : [],
+                        onSelect: { v in
+                            if let m = ProcessingMode(rawValue: v) {
+                                appState.processingMode = m
+                            }
+                        }
+                    )
+                    if !coordinator.onDeviceAI.isAvailable {
+                        Text("Local processing requires Apple Intelligence")
+                            .font(Tokens.Fonts.sans(size: 9))
+                            .foregroundStyle(Tokens.Colors.warmTextLight)
+                    }
+                }
             }
 
             VStack(alignment: .leading, spacing: Tokens.Spacing.xs) {
@@ -43,7 +71,10 @@ struct SettingsControls: View {
                     id: "resp",
                     options: [("on", "On"), ("off", "Off")],
                     selected: appState.responseEnabled ? "on" : "off",
-                    onSelect: { v in appState.responseEnabled = v == "on" }
+                    onSelect: { v in
+                        appState.responseEnabled = v == "on"
+                        coordinator.sendSettingsUpdate()
+                    }
                 )
             }
         }

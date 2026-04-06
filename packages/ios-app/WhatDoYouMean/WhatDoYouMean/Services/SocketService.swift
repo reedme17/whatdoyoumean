@@ -11,8 +11,8 @@ class SocketService {
 
     private var eventHandler: ((String, [String: Any]) -> Void)?
 
-    /// Connect to backend. In dev, use your Mac's local IP instead of localhost.
-    func connect(url: String = "http://192.168.1.105:3001",
+    /// Connect to backend.
+    func connect(url: String = "https://whatdoyoumean.onrender.com",
                  onEvent: @escaping (String, [String: Any]) -> Void) {
         eventHandler = onEvent
 
@@ -34,8 +34,19 @@ class SocketService {
             self?.connected = false
         }
 
-        socket.on(clientEvent: .error) { _, data in
-            print("[WS] Error:", data)
+        socket.on(clientEvent: .error) { data, _ in
+            // data is [Any]; first element is often a SocketAckEmitter (not useful)
+            // Only log if it contains a meaningful string or dict
+            for item in data {
+                if let dict = item as? [String: Any] {
+                    print("[WS] Error:", dict["message"] ?? dict)
+                    return
+                } else if let str = item as? String {
+                    print("[WS] Error:", str)
+                    return
+                }
+            }
+            // Suppress SocketAckEmitter noise
         }
 
         // Listen for all server event types (matches useSocket.ts eventTypes)
@@ -52,6 +63,7 @@ class SocketService {
             "error",
             "session:state",
             "processing:progress",
+            "session:summary",
         ]
 
         for type in eventTypes {
@@ -71,9 +83,21 @@ class SocketService {
     }
 
     /// Send event to server — mirrors useSocket send().
+    /// Socket.IO Swift requires SocketData-conforming items.
+    /// We serialize the dict to JSON data then back to a Foundation object
+    /// so nested dictionaries are properly handled.
     func send(type: String, data: [String: Any] = [:]) {
         var payload = data
         payload["type"] = type
-        socket?.emit(type, payload)
+        if type != "audio:chunk" {
+            print("[WS] send: \(type), connected=\(connected)")
+        }
+        if let jsonData = try? JSONSerialization.data(withJSONObject: payload),
+           let jsonObj = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] {
+            socket?.emit(type, jsonObj)
+        } else {
+            print("[WS] send: JSON round-trip failed for \(type), using raw payload")
+            socket?.emit(type, payload)
+        }
     }
 }

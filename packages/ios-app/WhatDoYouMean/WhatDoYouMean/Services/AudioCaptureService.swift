@@ -3,17 +3,25 @@ import Accelerate
 
 /// Audio capture service — mirrors useAudioCapture.ts.
 /// Uses AVAudioEngine instead of Web Audio API.
+/// Tap runs at ~50ms intervals for smooth waveform; chunks are accumulated and sent every 500ms.
 @Observable
 class AudioCaptureService {
     private let engine = AVAudioEngine()
     private(set) var isCapturing = false
-    private(set) var audioLevel: Float = 0  // RMS level for waveform visualization
+    private(set) var audioLevel: Float = 0
+
+    /// Time-domain sample buffer for waveform visualization (128 points, updated ~20x/sec).
+    private(set) var waveformSamples: [Float] = Array(repeating: 0, count: 128)
 
     /// Called with base64-encoded WAV chunks, same format as the Electron app sends.
     var onAudioChunk: ((String) -> Void)?
 
     private let targetSampleRate: Double = 16000
-    private let chunkDurationMs: Double = 500  // send every 500ms
+    private let chunkDurationMs: Double = 500
+
+    // Accumulator for chunk sending
+    private var accumulatedSamples: [Float] = []
+    private var lastChunkTime: Date = Date()
 
     func startCapture() throws {
         let session = AVAudioSession.sharedInstance()
@@ -22,12 +30,16 @@ class AudioCaptureService {
 
         let inputNode = engine.inputNode
         let inputFormat = inputNode.outputFormat(forBus: 0)
-        let bufferSize = AVAudioFrameCount(inputFormat.sampleRate * chunkDurationMs / 1000)
+        // Small buffer (~50ms) for responsive waveform
+        let tapBufferSize = AVAudioFrameCount(inputFormat.sampleRate * 0.05)
 
-        inputNode.installTap(onBus: 0, bufferSize: bufferSize, format: inputFormat) {
+        accumulatedSamples = []
+        lastChunkTime = Date()
+
+        inputNode.installTap(onBus: 0, bufferSize: tapBufferSize, format: inputFormat) {
             [weak self] buffer, _ in
             guard let self else { return }
-            self.processBuffer(buffer, inputRate: inputFormat.sampleRate)
+            self.processTap(buffer, inputRate: inputFormat.sampleRate)
         }
 
         try engine.start()
@@ -39,6 +51,8 @@ class AudioCaptureService {
         engine.stop()
         isCapturing = false
         audioLevel = 0
+        waveformSamples = Array(repeating: 0, count: 128)
+        accumulatedSamples = []
         try? AVAudioSession.sharedInstance().setActive(false)
     }
 
@@ -52,30 +66,52 @@ class AudioCaptureService {
         isCapturing = true
     }
 
-    // MARK: - Audio Processing (mirrors encodeWavBase64 + downsample in useAudioCapture.ts)
+    // MARK: - Tap Processing
 
-    private func processBuffer(_ buffer: AVAudioPCMBuffer, inputRate: Double) {
+    /// Called ~20x/sec (every ~50ms). Updates waveform immediately, accumulates for chunk sending.
+    private func processTap(_ buffer: AVAudioPCMBuffer, inputRate: Double) {
         guard let channelData = buffer.floatChannelData?[0] else { return }
         let frameCount = Int(buffer.frameLength)
         let samples = Array(UnsafeBufferPointer(start: channelData, count: frameCount))
 
-        // Calculate RMS for visualization (mirrors calculateRMS)
-        let rms = calculateRMS(samples)
-        DispatchQueue.main.async { self.audioLevel = rms }
+        // 1) Waveform: 128-point time-domain snapshot (updated every tap = ~50ms)
+        let pointCount = 128
+        let step = max(1, frameCount / pointCount)
+        var snapshot = [Float](repeating: 0, count: pointCount)
+        for i in 0..<pointCount {
+            let idx = min(i * step, frameCount - 1)
+            snapshot[i] = abs(samples[idx])
+        }
 
-        // Downsample if needed (mirrors downsample function)
+        let rms = calculateRMS(samples)
+
+        DispatchQueue.main.async {
+            self.audioLevel = rms
+            self.waveformSamples = snapshot
+        }
+
+        // 2) Accumulate resampled audio for chunk sending (every 500ms)
         let resampled: [Float]
         if inputRate != targetSampleRate {
             resampled = downsample(samples, from: inputRate, to: targetSampleRate)
         } else {
             resampled = samples
         }
+        accumulatedSamples.append(contentsOf: resampled)
 
-        // Encode as WAV base64 (mirrors encodeWavBase64)
-        let wavData = encodeWav(samples: resampled, sampleRate: Int(targetSampleRate))
-        let base64 = wavData.base64EncodedString()
-        onAudioChunk?(base64)
+        let elapsed = Date().timeIntervalSince(lastChunkTime) * 1000
+        if elapsed >= chunkDurationMs {
+            let chunkSamples = accumulatedSamples
+            accumulatedSamples = []
+            lastChunkTime = Date()
+
+            let wavData = encodeWav(samples: chunkSamples, sampleRate: Int(targetSampleRate))
+            let base64 = wavData.base64EncodedString()
+            onAudioChunk?(base64)
+        }
     }
+
+    // MARK: - DSP Helpers
 
     private func calculateRMS(_ samples: [Float]) -> Float {
         guard !samples.isEmpty else { return 0 }
@@ -95,7 +131,7 @@ class AudioCaptureService {
         return result
     }
 
-    /// Encode Float32 samples as 16-bit PCM WAV — same format as useAudioCapture.ts encodeWavBase64.
+    /// Encode Float32 samples as 16-bit PCM WAV.
     private func encodeWav(samples: [Float], sampleRate: Int) -> Data {
         let numChannels: Int = 1
         let bitsPerSample: Int = 16
@@ -106,26 +142,22 @@ class AudioCaptureService {
 
         var data = Data(capacity: fileSize)
 
-        // RIFF header
         data.append(contentsOf: "RIFF".utf8)
         data.append(uint32LE: UInt32(fileSize - 8))
         data.append(contentsOf: "WAVE".utf8)
 
-        // fmt chunk
         data.append(contentsOf: "fmt ".utf8)
         data.append(uint32LE: 16)
-        data.append(uint16LE: 1)  // PCM
+        data.append(uint16LE: 1)
         data.append(uint16LE: UInt16(numChannels))
         data.append(uint32LE: UInt32(sampleRate))
         data.append(uint32LE: UInt32(byteRate))
         data.append(uint16LE: UInt16(blockAlign))
         data.append(uint16LE: UInt16(bitsPerSample))
 
-        // data chunk
         data.append(contentsOf: "data".utf8)
         data.append(uint32LE: UInt32(dataSize))
 
-        // Convert Float32 [-1, 1] to Int16
         for sample in samples {
             let clamped = max(-1.0, min(1.0, sample))
             let int16 = Int16(clamped * 32767)

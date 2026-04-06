@@ -178,3 +178,18 @@ enum AudioSourceMode: String, CaseIterable {
         }
     }
 }
+
+/// Processing mode — determines where LLM inference runs.
+enum ProcessingMode: String, CaseIterable {
+    case local   // Apple Foundation Model on-device (default)
+    case cloud   // Backend LLM via WebSocket
+    case fusion  // Local first, cloud refines
+
+    var label: String {
+        switch self {
+        case .local: return "Local"
+        case .cloud: return "Cloud"
+        case .fusion: return "Fusion"
+        }
+    }
+}

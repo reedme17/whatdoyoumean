@@ -4,6 +4,7 @@ import SwiftUI
 /// Manual text input for when audio isn't available.
 struct TextModeScreen: View {
     @Environment(AppState.self) private var appState
+    @Environment(SessionCoordinator.self) private var coordinator
     @State private var inputText = ""
     @FocusState private var focused: Bool
 
@@ -78,7 +79,14 @@ struct TextModeScreen: View {
 
     private func sendText() {
         guard !inputText.isEmpty else { return }
-        // TODO: send text:submit via SocketService
+        let text = inputText
         inputText = ""
+
+        if appState.processingMode == .local || appState.processingMode == .fusion {
+            coordinator.processTextLocally(text)
+        }
+        if appState.processingMode == .cloud || appState.processingMode == .fusion {
+            coordinator.socket.send(type: "text:submit", data: ["text": text])
+        }
     }
 }

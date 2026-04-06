@@ -1,69 +1,70 @@
 import SwiftUI
 
 /// Recap screen — shown after session ends.
-/// Mirrors RecapScreen.tsx — shows all cards with speaker grouping.
+/// Matches Mac RecapScreen.tsx layout: serif title top-left, cards, bottom bar with New session + X.
 struct RecapScreen: View {
     @Environment(AppState.self) private var appState
+    @Environment(SessionCoordinator.self) private var coordinator
 
     var body: some View {
         VStack(spacing: 0) {
-            // Top bar
+            // Cards area
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    // Title
+                    Text("Session recap")
+                        .font(Tokens.Fonts.serif(size: 20))
+                        .foregroundStyle(Tokens.Colors.warmText)
+                        .padding(.horizontal, Tokens.Spacing.xl)
+                        .padding(.top, 12)
+                        .padding(.bottom, 4)
+
+                    // Speaker-grouped cards
+                    LazyVStack(alignment: .leading, spacing: Tokens.Spacing.sm) {
+                        ForEach(groupedCards, id: \.speakerKey) { group in
+                            SpeakerGroup(group: group)
+                        }
+                    }
+                    .padding(.vertical, Tokens.Spacing.md)
+
+                    if appState.cards.isEmpty {
+                        Text("Nothing was captured in this session.")
+                            .font(Tokens.Fonts.sans(size: Tokens.FontSize.sm))
+                            .foregroundStyle(Tokens.Colors.warmTextLight)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 64)
+                    }
+                }
+            }
+
+            // Bottom bar: New session (left) — X (right)
             HStack {
                 Button {
                     appState.reset()
+                    appState.startSession()
+                    coordinator.startSession()
                 } label: {
-                    Image(systemName: "xmark")
+                    Text("New session")
+                        .font(Tokens.Fonts.sans(size: Tokens.FontSize.sm, weight: .bold))
                         .foregroundStyle(Tokens.Colors.muted)
+                        .frame(height: 44)
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                Button {
+                    coordinator.disconnect()
+                    appState.reset()
+                } label: {
+                    XIcon(size: 20, color: Tokens.Colors.muted)
+                        .allowsHitTesting(false)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Close recap")
-
-                Spacer()
-
-                Text("Recap")
-                    .font(.system(size: Tokens.FontSize.sm, weight: .semibold))
-                    .foregroundStyle(Tokens.Colors.warmText)
-
-                Spacer()
-
-                // Share / export button
-                Button {
-                    // TODO: share session
-                } label: {
-                    Image(systemName: "square.and.arrow.up")
-                        .foregroundStyle(Tokens.Colors.muted)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Share recap")
             }
-            .padding(.horizontal, Tokens.Spacing.xl)
-            .padding(.vertical, Tokens.Spacing.md)
-
-            Divider()
-
-            // Cards
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: Tokens.Spacing.sm) {
-                    ForEach(groupedCards, id: \.speakerKey) { group in
-                        SpeakerGroup(group: group)
-                    }
-                }
-                .padding(.vertical, Tokens.Spacing.md)
-            }
-
-            // Done button
-            Button {
-                appState.reset()
-            } label: {
-                Text("Done")
-                    .font(.system(size: Tokens.FontSize.sm, weight: .bold))
-                    .foregroundStyle(Tokens.Colors.warmTextDark)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, Tokens.Spacing.md)
-                    .background(Tokens.Colors.warmBg)
-                    .clipShape(RoundedRectangle(cornerRadius: Tokens.Radius.xl))
-            }
-            .buttonStyle(.plain)
             .padding(.horizontal, Tokens.Spacing.xl)
             .padding(.bottom, Tokens.Spacing.xl)
         }

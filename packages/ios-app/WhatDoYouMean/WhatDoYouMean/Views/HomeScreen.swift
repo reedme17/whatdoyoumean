@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HomeScreen: View {
     @Environment(AppState.self) private var appState
+    @Environment(SessionCoordinator.self) private var coordinator
     @State private var transitioning = false
     @State private var contentOpacity: Double = 1
     @State private var morphProgress: CGFloat = 0
@@ -9,7 +10,9 @@ struct HomeScreen: View {
     @State private var screenWidth: CGFloat = 402
     @State private var screenMaxY: CGFloat = 840
 
-    // BottomBar measured: h=84, bottom-aligned to screen
+    // Staggered entrance
+    @State private var appeared = false
+
     private let barH: CGFloat = 84
 
     var body: some View {
@@ -19,9 +22,18 @@ struct HomeScreen: View {
             VStack(spacing: 0) {
                 Spacer()
 
+                AnimatedOnboardingSVG()
+                    .aspectRatio(1408.0 / 768.0, contentMode: .fit)
+                    .padding(.horizontal, Tokens.Spacing.md)
+
+                Spacer().frame(height: Tokens.Spacing.lg)
+
                 Text("Ready to interpret for you.")
                     .font(Tokens.Fonts.serif(size: Tokens.FontSize.xl))
                     .foregroundStyle(Tokens.Colors.warmText)
+                    .opacity(appeared ? 1 : 0)
+                    .offset(y: appeared ? 0 : 14)
+                    .animation(.easeOut(duration: 0.5).delay(0.25), value: appeared)
 
                 Spacer().frame(height: Tokens.Spacing.xl)
 
@@ -44,6 +56,9 @@ struct HomeScreen: View {
                         .onChange(of: g.frame(in: .global)) { _, f in buttonGlobal = f }
                 })
                 .accessibilityLabel("Start listening session")
+                .opacity(appeared ? 1 : 0)
+                .offset(y: appeared ? 0 : 12)
+                .animation(.easeOut(duration: 0.5).delay(0.4), value: appeared)
 
                 Spacer().frame(height: Tokens.Spacing.md)
 
@@ -56,6 +71,8 @@ struct HomeScreen: View {
                         .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Switch to text input mode")
+                .opacity(appeared ? 1 : 0)
+                .animation(.easeOut(duration: 0.4).delay(0.55), value: appeared)
 
                 Spacer()
 
@@ -71,9 +88,11 @@ struct HomeScreen: View {
                     }
                     .accessibilityLabel("Open menu")
                 }
-                .padding(Tokens.Spacing.sm)
+                .padding(.bottom, Tokens.Spacing.xl)
+                .opacity(appeared ? 1 : 0)
+                .animation(.easeOut(duration: 0.4).delay(0.6), value: appeared)
             }
-            .padding(Tokens.Spacing.sm)
+            .padding(.horizontal, Tokens.Spacing.xl)
             .opacity(contentOpacity)
             .background(GeometryReader { g in
                 Color.clear.onAppear {
@@ -83,8 +102,8 @@ struct HomeScreen: View {
                 }
             })
         }
+        .onAppear { appeared = true }
         .overlay {
-            // Morph bar in global coordinate overlay (above everything, ignores safe area)
             if transitioning {
                 GeometryReader { fullGeo in
                     let t = morphProgress
@@ -95,7 +114,6 @@ struct HomeScreen: View {
                     let startW = buttonGlobal.width
                     let startH = buttonGlobal.height
 
-                    // End: BottomBar top at y=756, extends to physical screen bottom
                     let endX: CGFloat = 0
                     let endY = screenMaxY - barH
                     let endW = screenWidth
@@ -136,6 +154,7 @@ struct HomeScreen: View {
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
             appState.startSession()
+            coordinator.startSession()
         }
     }
 

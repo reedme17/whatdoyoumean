@@ -2,6 +2,7 @@ import SwiftUI
 
 struct BottomBarView: View {
     @Environment(AppState.self) private var appState
+    @Environment(SessionCoordinator.self) private var coordinator
     @State private var showMarkedToast = false
     @State private var elapsedSeconds: Int = 0
     @State private var timer: Timer?
@@ -10,9 +11,26 @@ struct BottomBarView: View {
     @State private var durationVisible: Bool = true
     @State private var hideTask: DispatchWorkItem?
     @State private var showSettings = false
+    @State private var markBounce = false
 
     var body: some View {
-        HStack {
+        VStack(spacing: 0) {
+            // Pending preview text — expands bar height when present
+            if !appState.pendingPreview.isEmpty {
+                HStack {
+                    Text(appState.pendingPreview + "...")
+                        .font(Tokens.Fonts.sans(size: Tokens.FontSize.sm, weight: .medium))
+                        .foregroundStyle(Tokens.Colors.contentText)
+                        .lineLimit(3)
+                    Spacer()
+                }
+                .padding(.horizontal, Tokens.Spacing.xl)
+                .padding(.top, Tokens.Spacing.xl)
+                .padding(.bottom, Tokens.Spacing.xs)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+
+            HStack {
             // Left: "Listening..." + duration
             Button {
                 // Touch to show duration
@@ -39,7 +57,14 @@ struct BottomBarView: View {
 
             // Center: Mark moment
             PressableBarButton {
+                coordinator.sendBookmark()
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+                    markBounce = true
+                }
                 withAnimation { showMarkedToast = true }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    markBounce = false
+                }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                     withAnimation { showMarkedToast = false }
                 }
@@ -48,6 +73,7 @@ struct BottomBarView: View {
                     .allowsHitTesting(false)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
+                    .scaleEffect(markBounce ? 1.3 : 1.0)
             }
             .accessibilityLabel("Mark this moment")
             .overlay(alignment: .top) {
@@ -90,6 +116,7 @@ struct BottomBarView: View {
                 }
 
                 PressableBarButton {
+                    coordinator.stopSession()
                     appState.endSession()
                 } content: { pressed in
                     HStack(spacing: 6) {
@@ -107,6 +134,8 @@ struct BottomBarView: View {
         }
         .padding(.horizontal, Tokens.Spacing.xl)
         .padding(.vertical, Tokens.Spacing.xl)
+        }
+        .animation(.easeOut(duration: 0.25), value: appState.pendingPreview)
         .background(
             Tokens.Colors.warmBg
                 .clipShape(

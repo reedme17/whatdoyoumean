@@ -1273,3 +1273,61 @@ All icons hand-drawn with SwiftUI `Canvas` using the same SVG paths as the Elect
 - `packages/electron-app/src/renderer/hooks/useSocket.ts` (WS_URL)
 - `packages/backend/src/index.ts` (single-port, dotenv fix)
 - `Dockerfile`, `railway.json`, `.npmrc`, `.gitignore`
+
+---
+
+## Phase 8: Apple Foundation Model Integration (iOS)
+
+Added on-device LLM processing via Apple Foundation Models framework (iOS 26+).
+
+### Processing Modes
+Three-mode architecture added to iOS app settings:
+- **Local** (default): Cloud STT (Deepgram) → on-device Apple FM for semantic analysis, recommendations, consolidation
+- **Cloud**: Cloud STT → backend LLM (Cerebras Qwen 3 235B) — original behavior
+- **Fusion**: Cloud STT → local FM for fast cards + cloud LLM refines
+
+### Offline Fallback
+- `NWPathMonitor` detects network status at session start
+- No network → automatic fallback to Apple Speech (local STT) + Apple FM (local LLM)
+- Fully offline capable on supported devices
+
+### OnDeviceIntelligenceService
+New service replicating the full backend pipeline on-device:
+- `analyze()` — single segment semantic analysis with `@Generable` structured output
+- `analyzeMulti()` — multi-card extraction with ⭐IMPORTANT marker support
+- `consolidate()` — final consolidation: speaker runs → re-analyze → dedup → highlight inheritance
+- `windowConsolidate()` — mid-session sliding window consolidation with locked cards
+- `generateRecommendations()` — 1-3 intent-focused suggestions per card
+- `generateSummary()` — session summary generation
+- All prompts, category definitions, dedup algorithm (same category + >60% word overlap), content limits (30 words EN / 50 chars ZH) match backend exactly
+- `#if canImport(FoundationModels)` for backward compatibility with iOS < 26
+- Fresh `LanguageModelSession` per call to avoid concurrent respond() errors
+
+### SessionCoordinator Changes
+- Unified cloud STT for all modes (Deepgram via WebSocket)
+- Serial FM request queue (`fmPendingQueue`) to prevent `concurrentRequests` errors
+- `handleLocalLLMEvent` / `handleCloudEvent` / `handleFusionEvent` — mode-specific event routing
+- Audio capture starts after `session:start` to prevent "No active session" errors
+- `maxPendingChars` increased to 300 for better FM context
+
+### UI Changes
+- Settings: "Processing mode" pill tabs (Local / Cloud / Fusion) with auto-disable when FM unavailable
+- Badge label width increased from 48pt to 60pt (fixes "Response" cutoff)
+- TextModeScreen: routes text:submit through local or cloud based on processing mode
+
+### Backend Changes
+- Cerebras model upgraded to `qwen-3-235b-a22b-instruct-2507`
+- dotenv loads from both cwd and root `../../.env` for flexible startup
+- SocketService error logging improved (filters out SocketAckEmitter noise)
+
+### Changed Files
+- `packages/ios-app/.../Services/OnDeviceIntelligenceService.swift` (new)
+- `packages/ios-app/.../Services/SessionCoordinator.swift` (rewritten)
+- `packages/ios-app/.../Services/SocketService.swift` (error logging)
+- `packages/ios-app/.../Models/SharedTypes.swift` (ProcessingMode enum)
+- `packages/ios-app/.../Models/AppState.swift` (processingMode property)
+- `packages/ios-app/.../Views/SettingsControls.swift` (processing mode UI)
+- `packages/ios-app/.../Views/TextModeScreen.swift` (local text processing)
+- `packages/ios-app/.../Views/CoreMeaningCardRow.swift` (badge width fix)
+- `packages/backend/src/llm/providers/cerebras.ts` (model change)
+- `packages/backend/src/index.ts` (dotenv path fix)
