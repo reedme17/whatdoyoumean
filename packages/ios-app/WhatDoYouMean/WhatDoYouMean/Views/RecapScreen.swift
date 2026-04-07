@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Recap screen — shown after session ends.
-/// Matches Mac RecapScreen.tsx layout: serif title top-left, cards, bottom bar with New session + X.
+/// Matches Mac RecapScreen.tsx layout: serif title top-left, cards with mark toggle, speaker rename, bottom bar.
 struct RecapScreen: View {
     @Environment(AppState.self) private var appState
     @Environment(SessionCoordinator.self) private var coordinator
@@ -19,13 +19,44 @@ struct RecapScreen: View {
                         .padding(.top, 12)
                         .padding(.bottom, 4)
 
-                    // Speaker-grouped cards
+                    // Speaker-grouped cards with mark toggle + rename
                     LazyVStack(alignment: .leading, spacing: Tokens.Spacing.sm) {
                         ForEach(groupedCards, id: \.speakerKey) { group in
-                            SpeakerGroup(group: group)
+                            SpeakerGroup(
+                                group: group,
+                                onToggleMark: { cardId in
+                                    toggleMark(cardId)
+                                },
+                                onRenameSpeaker: { speakerKey, newName in
+                                    appState.speakers[speakerKey] = newName
+                                }
+                            )
                         }
                     }
                     .padding(.vertical, Tokens.Spacing.md)
+
+                    // Recommendations
+                    if appState.responseEnabled && !appState.recommendations.isEmpty {
+                        HStack(alignment: .top, spacing: Tokens.Spacing.sm) {
+                            CornerDownRightIcon(size: 14, color: Tokens.Colors.warmTextLight)
+                                .padding(.top, 3)
+                            FlowLayout(spacing: 6) {
+                                ForEach(appState.recommendations) { rec in
+                                    Text(rec.text)
+                                        .font(Tokens.Fonts.sans(size: 10, weight: .medium))
+                                        .foregroundStyle(Tokens.Colors.warmText)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 3)
+                                        .overlay(
+                                            Capsule()
+                                                .stroke(Tokens.Colors.border, lineWidth: 1)
+                                        )
+                                }
+                            }
+                        }
+                        .padding(.horizontal, Tokens.Spacing.xl)
+                        .padding(.top, Tokens.Spacing.sm)
+                    }
 
                     if appState.cards.isEmpty {
                         Text("Nothing was captured in this session.")
@@ -69,6 +100,20 @@ struct RecapScreen: View {
             .padding(.bottom, Tokens.Spacing.xl)
         }
         .background(Tokens.Colors.background)
+    }
+
+    private func toggleMark(_ cardId: String) {
+        if let idx = appState.cards.firstIndex(where: { $0.id == cardId }) {
+            let card = appState.cards[idx]
+            appState.cards[idx] = CoreMeaningCard(
+                id: card.id, sessionId: card.sessionId, category: card.category,
+                content: card.content, sourceSegmentIds: card.sourceSegmentIds,
+                linkedCardIds: card.linkedCardIds, linkType: card.linkType,
+                topicId: card.topicId, visualizationFormat: card.visualizationFormat,
+                isHighlighted: !card.isHighlighted, speakerId: card.speakerId,
+                createdAt: card.createdAt, updatedAt: card.updatedAt
+            )
+        }
     }
 
     private var groupedCards: [SpeakerCardGroup] {

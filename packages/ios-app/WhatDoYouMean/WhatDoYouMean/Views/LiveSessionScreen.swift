@@ -68,24 +68,100 @@ struct SpeakerCardGroup: Identifiable {
 
 struct SpeakerGroup: View {
     let group: SpeakerCardGroup
+    var onToggleMark: ((String) -> Void)? = nil
+    var onRenameSpeaker: ((String, String) -> Void)? = nil  // (speakerKey, newName)
+
+    @State private var showRename = false
+    @State private var editName = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Spacing.sm) {
-            Text(group.speakerName)
-                .font(Tokens.Fonts.sans(size: Tokens.FontSize.sm, weight: .semibold))
-                .foregroundStyle(Tokens.Colors.warmText)
+            // Speaker name + rename button
+            HStack(alignment: .firstTextBaseline, spacing: Tokens.Spacing.sm) {
+                Text(group.speakerName)
+                    .font(Tokens.Fonts.sans(size: Tokens.FontSize.sm, weight: .semibold))
+                    .foregroundStyle(Tokens.Colors.warmText)
 
-            VStack(alignment: .leading, spacing: 8) {
+                if onRenameSpeaker != nil {
+                    Button {
+                        editName = group.speakerName.hasPrefix("Speaker") ? "" : group.speakerName
+                        showRename = true
+                    } label: {
+                        Text(group.speakerName.hasPrefix("Speaker") ? "Add name" : "Edit")
+                            .font(Tokens.Fonts.sans(size: 10, weight: .bold))
+                            .foregroundStyle(Tokens.Colors.warmTextDark)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(Tokens.Colors.warmBg)
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .popover(isPresented: $showRename, attachmentAnchor: .point(.trailing), arrowEdge: .leading) {
+                        VStack(spacing: Tokens.Spacing.sm) {
+                            TextField("Enter name...", text: $editName)
+                                .font(Tokens.Fonts.sans(size: Tokens.FontSize.xs))
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 180)
+                                .onSubmit { saveName() }
+
+                            HStack {
+                                Button("Cancel") { showRename = false }
+                                    .font(Tokens.Fonts.sans(size: 10))
+                                    .foregroundStyle(Tokens.Colors.warmTextLight)
+                                    .buttonStyle(.plain)
+                                Spacer()
+                                // "Apply to all Speaker X" — shows when speaker hasn't been globally renamed
+                                if group.speakerName.hasPrefix("Speaker") {
+                                    Button("Apply to all \(group.speakerName)") {
+                                        let trimmed = editName.trimmingCharacters(in: .whitespacesAndNewlines)
+                                        guard !trimmed.isEmpty else { return }
+                                        onRenameSpeaker?(group.speakerKey, trimmed)
+                                        showRename = false
+                                    }
+                                    .font(Tokens.Fonts.sans(size: 10, weight: .medium))
+                                    .foregroundStyle(
+                                        editName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                            ? Tokens.Colors.warmTextLight.opacity(0.5)
+                                            : Tokens.Colors.warmTextDark
+                                    )
+                                    .buttonStyle(.plain)
+                                    .disabled(editName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                                }
+                                Button("Save") { saveName() }
+                                    .font(Tokens.Fonts.sans(size: 10, weight: .medium))
+                                    .foregroundStyle(Tokens.Colors.warmTextDark)
+                                    .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(Tokens.Spacing.md)
+                        .presentationCompactAdaptation(.popover)
+                    }
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(group.cards.enumerated()), id: \.element.id) { index, card in
                     if index > 0 {
                         Divider()
+                            .padding(.vertical, 8)
                     }
-                    CoreMeaningCardRow(card: card)
+                    CoreMeaningCardRow(card: card, onToggleMark: onToggleMark)
                 }
             }
         }
         .padding(.horizontal, Tokens.Spacing.xl)
         .padding(.vertical, Tokens.Spacing.md)
+    }
+
+    private func saveName() {
+        let trimmed = editName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            // Reset to default
+            onRenameSpeaker?(group.speakerKey, "Speaker \(group.speakerKey == "" ? "1" : group.speakerKey)")
+        } else {
+            onRenameSpeaker?(group.speakerKey, trimmed)
+        }
+        showRename = false
     }
 }
 

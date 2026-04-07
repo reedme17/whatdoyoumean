@@ -269,3 +269,37 @@ struct FeatherIcon: View {
         .frame(width: size, height: size)
     }
 }
+
+
+// MARK: - CornerDownRight Icon (reply/response indicator — from corner-down-right-icon.tsx)
+
+struct CornerDownRightIcon: View {
+    let size: CGFloat
+    var color: Color = Tokens.Colors.warmTextLight
+
+    init(size: CGFloat = 14, color: Color = Tokens.Colors.warmTextLight) { self.size = size; self.color = color }
+
+    var body: some View {
+        Canvas { context, canvasSize in
+            let s = canvasSize.width / 24
+            let style = StrokeStyle(lineWidth: 2 * s, lineCap: .round, lineJoin: .round)
+            // Arrow polyline: 15,10 -> 20,15 -> 15,20
+            var arrow = Path()
+            arrow.move(to: CGPoint(x: 15 * s, y: 10 * s))
+            arrow.addLine(to: CGPoint(x: 20 * s, y: 15 * s))
+            arrow.addLine(to: CGPoint(x: 15 * s, y: 20 * s))
+            context.stroke(arrow, with: .color(color), style: style)
+            // Path: M4,4 v7 a4,4 0,0,0 4,4 h12
+            var body = Path()
+            body.move(to: CGPoint(x: 4 * s, y: 4 * s))
+            body.addLine(to: CGPoint(x: 4 * s, y: 11 * s))
+            body.addQuadCurve(
+                to: CGPoint(x: 8 * s, y: 15 * s),
+                control: CGPoint(x: 4 * s, y: 15 * s)
+            )
+            body.addLine(to: CGPoint(x: 20 * s, y: 15 * s))
+            context.stroke(body, with: .color(color), style: style)
+        }
+        .frame(width: size, height: size)
+    }
+}

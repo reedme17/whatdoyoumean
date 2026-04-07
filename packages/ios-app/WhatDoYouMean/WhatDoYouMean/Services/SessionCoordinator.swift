@@ -34,6 +34,8 @@ class SessionCoordinator {
     /// Serializes on-device FM requests (LanguageModelSession doesn't allow concurrent calls).
     private var fmProcessingInFlight = false
     private var fmPendingQueue: [(text: String, speakerId: String)] = []
+    /// When true, the next locally-created card gets isHighlighted = true.
+    private var localMarkNextCard = false
 
     // Apple Speech (offline STT)
     private var speechRecognizer: SFSpeechRecognizer?
@@ -83,6 +85,7 @@ class SessionCoordinator {
         localConsolidationVersion = 0
         fmProcessingInFlight = false
         fmPendingQueue = []
+        localMarkNextCard = false
         onDeviceAI.resetSessions()
 
         // Offline? Fall back to local STT + local FM
@@ -195,7 +198,36 @@ class SessionCoordinator {
 
     func sendBookmark() {
         guard let appState, let start = appState.sessionStartTime else { return }
-        socket.send(type: "bookmark:create", data: ["timestamp": Date().timeIntervalSince(start) * 1000])
+
+        // Cloud mode: let backend handle marking
+        if !isOfflineFallback && appState.processingMode != .local {
+            socket.send(type: "bookmark:create", data: ["timestamp": Date().timeIntervalSince(start) * 1000])
+        }
+
+        // Local/offline: mark locally
+        if usesLocalLLM || isOfflineFallback {
+            // Track pending text as marked
+            if !localPendingText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                localMarkedTexts.insert(localPendingText)
+                localMarkNextCard = true
+                // Force-finalize pending text so the mark lands on it
+                finalizeLocalPendingText()
+            } else if let lastIdx = appState.cards.indices.last {
+                // No pending text — highlight the most recent card
+                let card = appState.cards[lastIdx]
+                appState.cards[lastIdx] = CoreMeaningCard(
+                    id: card.id, sessionId: card.sessionId, category: card.category,
+                    content: card.content, sourceSegmentIds: card.sourceSegmentIds,
+                    linkedCardIds: card.linkedCardIds, linkType: card.linkType,
+                    topicId: card.topicId, visualizationFormat: card.visualizationFormat,
+                    isHighlighted: true, speakerId: card.speakerId,
+                    createdAt: card.createdAt, updatedAt: card.updatedAt
+                )
+            } else {
+                // No cards and no pending text — mark the next card that arrives
+                localMarkNextCard = true
+            }
+        }
     }
 
 
@@ -433,7 +465,21 @@ class SessionCoordinator {
                 topicMap: TopicMap(sessionId: "", topics: [], relations: [])
             ) {
                 print("[SessionCoordinator] FM card: \"\(card.content.prefix(50))\" category=\(card.category.rawValue)")
-                appState.cards.append(card)
+                // Apply markNextCard flag if set
+                var finalCard = card
+                if localMarkNextCard {
+                    finalCard = CoreMeaningCard(
+                        id: card.id, sessionId: card.sessionId, category: card.category,
+                        content: card.content, sourceSegmentIds: card.sourceSegmentIds,
+                        linkedCardIds: card.linkedCardIds, linkType: card.linkType,
+                        topicId: card.topicId, visualizationFormat: card.visualizationFormat,
+                        isHighlighted: true, speakerId: card.speakerId,
+                        createdAt: card.createdAt, updatedAt: card.updatedAt
+                    )
+                    localMarkNextCard = false
+                    print("[SessionCoordinator] Auto-highlighted card from pending mark")
+                }
+                appState.cards.append(finalCard)
                 appState.pendingPreview = ""
 
                 if appState.responseEnabled {

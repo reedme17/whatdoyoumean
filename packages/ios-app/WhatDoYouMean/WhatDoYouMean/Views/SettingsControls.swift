@@ -5,10 +5,34 @@ struct SettingsControls: View {
     @Environment(SessionCoordinator.self) private var coordinator
     var variant: Variant = .full
 
-    enum Variant { case full, responseOnly }
+    enum Variant { case full, responseOnly, textMode }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Spacing.md) {
+            if variant == .textMode {
+                VStack(alignment: .leading, spacing: Tokens.Spacing.xs) {
+                    Text("Processing mode")
+                        .font(Tokens.Fonts.sans(size: 10, weight: .medium))
+                        .foregroundStyle(Tokens.Colors.warmText)
+                    PillTabs(
+                        id: "text-proc",
+                        options: [("local", "Local"), ("cloud", "Cloud")],
+                        selected: appState.processingMode.rawValue,
+                        disabled: !coordinator.onDeviceAI.isAvailable ? ["local"] : [],
+                        onSelect: { v in
+                            if let m = ProcessingMode(rawValue: v) {
+                                appState.processingMode = m
+                            }
+                        }
+                    )
+                    if !coordinator.onDeviceAI.isAvailable {
+                        Text("Local processing requires Apple Intelligence")
+                            .font(Tokens.Fonts.sans(size: 9))
+                            .foregroundStyle(Tokens.Colors.warmTextLight)
+                    }
+                }
+            }
+
             if variant == .full {
                 VStack(alignment: .leading, spacing: Tokens.Spacing.xs) {
                     Text("Language")

@@ -1331,3 +1331,66 @@ New service replicating the full backend pipeline on-device:
 - `packages/ios-app/.../Views/CoreMeaningCardRow.swift` (badge width fix)
 - `packages/backend/src/llm/providers/cerebras.ts` (model change)
 - `packages/backend/src/index.ts` (dotenv path fix)
+
+---
+
+## iOS Text Mode, Mark/Highlight, Speaker Rename (2025-04-06)
+
+### Text Mode — Complete Redesign
+- Three-phase flow: Input → Processing → Result (matches Mac TextModeScreen.tsx)
+- Input phase: title top-left (same serif 20px as RecapScreen), left-aligned textarea, Analyze button top-right
+- Processing phase: centered "Analyzing..." with animated stage updates from backend `processing:progress`
+- Result phase: recap-style card list with recommendations, "Analyze another" + settings + X bottom bar
+- All padding/font/color values pixel-matched to RecapScreen
+
+### Text Mode Settings
+- New `SettingsControls` variant `.textMode`: Processing mode (Local/Cloud only, no Fusion) + Response recommendation
+- Entering text mode auto-snaps Fusion → Local
+- Settings popover uses same SlidersIcon button pattern as audio mode BottomBarView
+
+### Text Mode Cloud Fix
+- Cloud mode now sends `session:start` (mode: "offline") before `text:submit` — fixes "No active session" error
+- Event handler processes `card:created`, `recommendation:new`, `processing:progress`
+
+### Processing Mode Switch in Result
+- Changing Local ↔ Cloud in result page re-analyzes same text with new model
+- Stays on result page with "Thinking..." indicator (no flash to "No results")
+- Recommendations area shows "Thinking..." while waiting for token generation
+
+### Mark/Highlight Feature — Full Implementation
+- `CoreMeaningCardRow`: optional `onToggleMark` callback shows map-pin icon (plus/minus) per card
+- Yellow highlighter color `rgba(255, 230, 0, 0.28)` matches Mac CSS `.highlighter-mark`
+- Animated highlight: draw-on (left→right 0.5s easeOut) and erase (0.4s easeIn) animations
+- `SessionCoordinator.sendBookmark()`: local mode now marks correctly
+  - Pending text: adds to `localMarkedTexts`, sets `localMarkNextCard`, force-finalizes
+  - No pending text + cards exist: highlights last card immediately
+  - No cards: sets `localMarkNextCard` flag for next card
+- `processNextFMRequest`: checks `localMarkNextCard` flag, auto-highlights new card
+- Cloud mode: sends `bookmark:create` to backend, receives `card:updated` with highlight
+
+### Speaker Rename Feature
+- `SpeakerGroup`: "Add name" button (default names) / "Edit" button (custom names) next to speaker label
+- Popover with text field, Cancel/Save buttons, and "Apply to all Speaker X" for global rename
+- `RecapScreen` passes `onRenameSpeaker` callback → updates `appState.speakers` Map
+
+### Recommendations Display
+- `CornerDownRightIcon` added to Icons.swift (matches Mac corner-down-right-icon.tsx SVG)
+- `FlowLayout` custom Layout for flex-wrap pill tokens
+- Pill tokens: 10px font, capsule border, transparent bg — matches Mac RecommendationTokens.tsx
+- Arrow icon top-aligned with first row of tokens
+- RecapScreen now also shows recommendations (same layout as text mode result)
+
+### Bug Fixes
+- Recommendation ID uniqueness: added `_\(idx)` index to prevent duplicate rendering in ForEach
+- Card divider spacing: changed to `VStack(spacing: 0)` + `Divider().padding(.vertical, 8)` for equal gaps
+- `MapPinMinusIcon` added for unmark state (pin with minus only, no vertical line)
+
+### Changed Files
+- `packages/ios-app/.../Views/TextModeScreen.swift` (complete rewrite)
+- `packages/ios-app/.../Views/CoreMeaningCardRow.swift` (mark toggle + highlight animation)
+- `packages/ios-app/.../Views/RecapScreen.swift` (mark toggle + speaker rename + recommendations)
+- `packages/ios-app/.../Views/LiveSessionScreen.swift` (SpeakerGroup rename UI + divider spacing)
+- `packages/ios-app/.../Views/SettingsControls.swift` (textMode variant)
+- `packages/ios-app/.../Views/Icons.swift` (CornerDownRightIcon)
+- `packages/ios-app/.../Services/SessionCoordinator.swift` (local mark + markNextCard)
+- `packages/ios-app/.../Services/OnDeviceIntelligenceService.swift` (recommendation ID fix)

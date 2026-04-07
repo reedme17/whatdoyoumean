@@ -316,9 +316,9 @@ class OnDeviceIntelligenceService {
             let response = try await session.respond(to: prompt, generating: RecommendationOutput.self)
             let result = response.content
             recSetCounter += 1
-            let recs = result.recommendations.prefix(3).filter { !previousTexts.contains($0.text) }.map { item in
+            let recs = result.recommendations.prefix(3).filter { !previousTexts.contains($0.text) }.enumerated().map { idx, item in
                 Recommendation(
-                    id: "rec_\(Int(Date().timeIntervalSince1970 * 1000))_\(recSetCounter)",
+                    id: "rec_\(Int(Date().timeIntervalSince1970 * 1000))_\(recSetCounter)_\(idx)",
                     sessionId: "", sourceCardId: card.id,
                     type: validateRecType(item.type), text: item.text, reasoning: item.reasoning,
                     memoryReferenceIds: [], setIndex: recSetCounter, createdAt: isoNow()
