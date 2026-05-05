@@ -129,6 +129,7 @@ export function App(): React.JSX.Element {
   const [sessionSummary, setSessionSummary] = useState("");
   const [textSummary, setTextSummary] = useState("");
   const [screenPermissionStatus, setScreenPermissionStatus] = useState<string | null>(null);
+  const [subtitleSources, setSubtitleSources] = useState<DesktopSource[]>([]);
   const [subtitleConfig, setSubtitleConfig] = useState<SubtitleCaptureConfig | null>(null);
   const [subtitleAccumulatedText, setSubtitleAccumulatedText] = useState("");
   const [subtitleStatusMessage, setSubtitleStatusMessage] = useState("Waiting for first capture.");
@@ -625,6 +626,7 @@ export function App(): React.JSX.Element {
     setTextSummary("");
     setResultErrorMessage(null);
     setRecommendationErrorMessage(null);
+    setSubtitleSources([]);
     setSubtitleConfig(null);
     setSubtitleAccumulatedText("");
     setSubtitlePendingText("");
@@ -732,6 +734,7 @@ export function App(): React.JSX.Element {
     resetSession();
     setSessionKind("subtitle");
     const sources = await loadSubtitleSources();
+    setSubtitleSources(sources);
     if (sources.length === 0) {
       setResultErrorMessage("No screen source is available for subtitle capture right now.");
       goToScreen("home");
@@ -1078,6 +1081,7 @@ export function App(): React.JSX.Element {
         <div key="subtitle-setup" className="screen-enter h-full">
           <SubtitleSetupScreen
             source={subtitleConfig ? { id: subtitleConfig.sourceId, name: subtitleConfig.sourceName } : null}
+            sources={subtitleSources}
             permissionStatus={screenPermissionStatus}
             onConfirm={handleSubtitleConfirm}
             onClose={() => {

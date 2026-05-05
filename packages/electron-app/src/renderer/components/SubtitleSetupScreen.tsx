@@ -17,6 +17,7 @@ interface DesktopSource {
 
 interface Props {
   source: DesktopSource | null;
+  sources: DesktopSource[];
   permissionStatus?: string | null;
   onConfirm: (config: {
     sourceId: string;
@@ -27,16 +28,26 @@ interface Props {
 }
 
 type DragMode = "move" | "resize-se" | "resize-sw" | "resize-ne" | "resize-nw";
+type CaptureMode = "free" | "window";
 
 const MIN_REGION_SIZE = 80;
+const DEFAULT_REGION: SubtitleRegion = {
+  x: 0.12,
+  y: 0.72,
+  width: 0.76,
+  height: 0.18,
+};
+const APP_WINDOW_NAME_PATTERNS = [/^啥意思$/i, /^what do you mean$/i, /^whatdoyoumean$/i, /^electron$/i];
 
 export function SubtitleSetupScreen({
   source,
+  sources,
   permissionStatus,
   onConfirm,
   onClose,
 }: Props): React.JSX.Element {
-  const [selectedSourceId] = useState<string>(source?.id ?? "");
+  const [captureMode, setCaptureMode] = useState<CaptureMode>("free");
+  const [selectedSourceId, setSelectedSourceId] = useState<string>(source?.id ?? "");
   const [videoReady, setVideoReady] = useState(false);
   const [region, setRegion] = useState<SubtitleRegion | null>(null);
   const [streamError, setStreamError] = useState<string | null>(null);
@@ -50,10 +61,43 @@ export function SubtitleSetupScreen({
   const videoRef = useRef<HTMLVideoElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
 
-  const selectedSource = useMemo(
-    () => (source && source.id === selectedSourceId ? source : null),
-    [selectedSourceId, source],
+  const screenSources = useMemo(
+    () => sources.filter((candidate) => candidate.id.startsWith("screen:")),
+    [sources],
   );
+  const windowSources = useMemo(
+    () =>
+      sources.filter(
+        (candidate) =>
+          candidate.id.startsWith("window:") &&
+          !APP_WINDOW_NAME_PATTERNS.some((pattern) => pattern.test(candidate.name.trim())),
+      ),
+    [sources],
+  );
+  const fallbackSource = useMemo(
+    () => source ?? screenSources[0] ?? windowSources[0] ?? null,
+    [screenSources, source, windowSources],
+  );
+
+  const selectedSource = useMemo(
+    () => sources.find((candidate) => candidate.id === selectedSourceId) ?? fallbackSource,
+    [fallbackSource, selectedSourceId, sources],
+  );
+
+  useEffect(() => {
+    if (captureMode === "free") {
+      const preferredScreen = screenSources.find((candidate) => candidate.id === selectedSourceId) ?? screenSources[0];
+      if (preferredScreen && preferredScreen.id !== selectedSourceId) {
+        setSelectedSourceId(preferredScreen.id);
+      }
+      return;
+    }
+
+    const preferredWindow = windowSources.find((candidate) => candidate.id === selectedSourceId) ?? windowSources[0];
+    if (preferredWindow && preferredWindow.id !== selectedSourceId) {
+      setSelectedSourceId(preferredWindow.id);
+    }
+  }, [captureMode, screenSources, selectedSourceId, windowSources]);
 
   useEffect(() => {
     let cancelled = false;
@@ -93,17 +137,20 @@ export function SubtitleSetupScreen({
 
   useEffect(() => {
     if (!videoReady || region) return;
-    setRegion({
-      x: 0.12,
-      y: 0.72,
-      width: 0.76,
-      height: 0.18,
-    });
+    setRegion(DEFAULT_REGION);
   }, [videoReady, region]);
 
   useEffect(() => {
     window.electronAPI?.resizeWindow?.(760).catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    if (captureMode === "free") {
+      setRegion((current) => current ?? DEFAULT_REGION);
+      return;
+    }
+    setDragState(null);
+  }, [captureMode]);
 
   useEffect(() => {
     if (!dragState) return;
@@ -179,6 +226,47 @@ export function SubtitleSetupScreen({
       </div>
 
       <div className="flex-1 px-[20px] py-[20px] overflow-hidden">
+        <div className="mb-3 inline-flex rounded-[14px] bg-[#F0EDE8] p-1">
+          <button
+            className={`rounded-[10px] px-4 py-2 font-sans text-sm transition-colors ${
+              captureMode === "free"
+                ? "bg-white text-[#60594D] shadow-[0_2px_10px_rgba(96,89,77,0.08)]"
+                : "text-[#93918E] hover:text-[#60594D]"
+            }`}
+            onClick={() => setCaptureMode("free")}
+            type="button"
+          >
+            Free select
+          </button>
+          <button
+            className={`rounded-[10px] px-4 py-2 font-sans text-sm transition-colors ${
+              captureMode === "window"
+                ? "bg-white text-[#60594D] shadow-[0_2px_10px_rgba(96,89,77,0.08)]"
+                : "text-[#93918E] hover:text-[#60594D]"
+            }`}
+            onClick={() => setCaptureMode("window")}
+            type="button"
+          >
+            Choose window
+          </button>
+        </div>
+
+        {captureMode === "window" && windowSources.length > 0 && (
+          <div className="mb-3">
+            <select
+              className="w-full rounded-[14px] border border-[#DED8CE] bg-white px-4 py-3 font-sans text-sm text-[#4E493F] outline-none"
+              value={selectedSourceId}
+              onChange={(event) => setSelectedSourceId(event.target.value)}
+            >
+              {windowSources.map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {candidate.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div className="mb-3 font-sans text-xs uppercase tracking-[0.18em] text-[#A6A095]">
           Live preview
         </div>
@@ -196,7 +284,7 @@ export function SubtitleSetupScreen({
               }}
             />
 
-            {videoReady && region && (
+            {videoReady && region && captureMode === "free" && (
               <div
                 className="absolute border-2 border-[#E67E45] bg-[rgba(230,126,69,0.12)]"
                 style={{
@@ -225,13 +313,13 @@ export function SubtitleSetupScreen({
       <div className="flex items-center justify-end gap-3 px-[20px] pt-[12px] pb-[20px] shrink-0">
         <Button
           variant="normal"
-          disabled={!selectedSource || !region}
+          disabled={!selectedSource || (captureMode === "free" && !region)}
           onClick={() => {
-            if (!selectedSource || !region) return;
+            if (!selectedSource) return;
             onConfirm({
               sourceId: selectedSource.id,
               sourceName: selectedSource.name,
-              region,
+              region: captureMode === "window" ? { x: 0, y: 0, width: 1, height: 1 } : (region ?? DEFAULT_REGION),
             });
           }}
         >
