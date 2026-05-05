@@ -803,6 +803,10 @@ export function App(): React.JSX.Element {
     const useTextResults = screen === "text" || screen === "subtitleLive" || sessionKind === "subtitle";
     const allCards = useTextResults ? textCards : cards;
     const allRecs = useTextResults ? textRecs : recommendations;
+    const isSubtitleMode = sessionKind === "subtitle";
+    const exportTranscript = isSubtitleMode
+      ? subtitleAccumulatedText.trim()
+      : transcriptTexts.join(" ").trim();
     const now = new Date();
     const dateStr = now.toISOString().slice(0, 10);
     const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, "");
@@ -858,10 +862,10 @@ export function App(): React.JSX.Element {
       sections.push("");
     }
 
-    // Original transcript
-    sections.push("## Original Transcript\n");
-    if (transcriptTexts.length > 0) {
-      sections.push(transcriptTexts.join(" "));
+    // Original transcript appendix
+    sections.push("## Appendix: Original Transcript\n");
+    if (exportTranscript) {
+      sections.push(exportTranscript);
     } else {
       sections.push("_(No transcript recorded)_");
     }
