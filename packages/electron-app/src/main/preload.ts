@@ -26,6 +26,9 @@ export interface ElectronAPI {
   getDesktopSources(): Promise<Array<{ id: string; name: string }>>;
   /** Check macOS screen recording permission */
   getScreenPermission(): Promise<string>;
+  runSubtitleOCR(imageDataUrl: string): Promise<string>;
+  resizeWindow(height: number): Promise<void>;
+  setWindowOpacity(opacity: number): Promise<void>;
 
   /** Subscribe to events pushed from the main process */
   onServerEvent(
@@ -56,6 +59,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // ── Desktop Capturer for system audio ──
   getDesktopSources: () => ipcRenderer.invoke("desktop:getSources"),
   getScreenPermission: () => ipcRenderer.invoke("desktop:getScreenPermission"),
+  runSubtitleOCR: (imageDataUrl: string) => ipcRenderer.invoke("subtitle:ocr", imageDataUrl),
+  resizeWindow: (height: number) => ipcRenderer.invoke("window:resize", height),
+  setWindowOpacity: (opacity: number) => ipcRenderer.invoke("window:setOpacity", opacity),
 
   // ── Server → Renderer events ──
   onServerEvent: (callback: (event: { type: string; payload: unknown }) => void) => {

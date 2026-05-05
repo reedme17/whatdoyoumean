@@ -76,6 +76,38 @@ describe("OpenAICompatibleAdapter", () => {
       for await (const c of iter) chunks.push(c);
     }).rejects.toThrow("Test Provider API key not configured");
   });
+
+  it("complete() surfaces JSON error payloads from the provider", async () => {
+    process.env.TEST_API_KEY = "sk-test-key";
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({ message: "Project does not have access to model gpt-oss-120b" }),
+        {
+          status: 402,
+          headers: { "content-type": "application/json", "x-request-id": "req_test_123" },
+        },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { OpenAICompatibleAdapter } = await import("./openai-compatible.js");
+    const adapter = new OpenAICompatibleAdapter({
+      id: "test",
+      name: "Test",
+      apiKeyEnvVar: "TEST_API_KEY",
+      baseURL: "https://api.test.com/v1",
+      model: "test-model",
+    });
+
+    await expect(
+      adapter.complete([{ role: "user", content: "hi" }], defaultOptions),
+    ).rejects.toMatchObject({
+      name: "APIResponseError",
+      status: 402,
+      requestID: "req_test_123",
+      message: "HTTP 402: Project does not have access to model gpt-oss-120b",
+    });
+  });
 });
 
 // ── CerebrasAdapter ──────────────────────────────────────────────

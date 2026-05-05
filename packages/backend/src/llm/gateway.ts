@@ -5,8 +5,7 @@ import type {
   LLMStreamChunk,
   ProviderStats,
 } from "./types.js";
-
-const DEFAULT_TIMEOUT_MS = 3000;
+import { DEFAULT_LLM_TIMEOUT_MS } from "../config/timeouts.js";
 
 interface InternalStats {
   totalRequests: number;
@@ -70,7 +69,8 @@ export class LLMGateway {
       throw new Error("No LLM providers registered");
     }
 
-    const timeoutMs = request.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const timeoutMs = request.timeoutMs ?? DEFAULT_LLM_TIMEOUT_MS;
+    const promptChars = request.messages.reduce((sum, m) => sum + m.content.length, 0);
     let lastError: unknown;
 
     for (const provider of ordered) {
@@ -78,20 +78,33 @@ export class LLMGateway {
       if (!available) continue;
 
       const start = Date.now();
+      const debugInfo = provider.getDebugInfo?.() ?? {};
+      console.log(
+        `[LLM] start task=${request.taskType} provider=${provider.id} model=${debugInfo.model ?? "unknown"} timeoutMs=${timeoutMs} maxTokens=${request.maxTokens} temperature=${request.temperature} promptChars=${promptChars}`,
+      );
       try {
         const response = await withTimeout(
           provider.complete(request.messages, {
+            taskType: request.taskType,
             maxTokens: request.maxTokens,
             temperature: request.temperature,
             timeoutMs,
           }),
           timeoutMs,
         );
-        this.recordSuccess(provider.id, Date.now() - start);
+        const elapsedMs = Date.now() - start;
+        this.recordSuccess(provider.id, elapsedMs);
+        console.log(
+          `[LLM] success task=${request.taskType} provider=${provider.id} model=${debugInfo.model ?? "unknown"} elapsedMs=${elapsedMs} promptTokens=${response.usage.promptTokens} completionTokens=${response.usage.completionTokens}`,
+        );
         return response;
       } catch (err) {
-        this.recordError(provider.id, Date.now() - start);
+        const elapsedMs = Date.now() - start;
+        this.recordError(provider.id, elapsedMs);
         lastError = err;
+        console.error(
+          `[LLM] error task=${request.taskType} provider=${provider.id} model=${debugInfo.model ?? "unknown"} elapsedMs=${elapsedMs} error=${formatError(err)}`,
+        );
         // fall through to next provider
       }
     }
@@ -109,7 +122,8 @@ export class LLMGateway {
       throw new Error("No LLM providers registered");
     }
 
-    const timeoutMs = request.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const timeoutMs = request.timeoutMs ?? DEFAULT_LLM_TIMEOUT_MS;
+    const promptChars = request.messages.reduce((sum, m) => sum + m.content.length, 0);
     let lastError: unknown;
 
     for (const provider of ordered) {
@@ -117,9 +131,14 @@ export class LLMGateway {
       if (!available) continue;
 
       const start = Date.now();
+      const debugInfo = provider.getDebugInfo?.() ?? {};
+      console.log(
+        `[LLM] stream-start task=${request.taskType} provider=${provider.id} model=${debugInfo.model ?? "unknown"} timeoutMs=${timeoutMs} maxTokens=${request.maxTokens} temperature=${request.temperature} promptChars=${promptChars}`,
+      );
       try {
         // Get the first chunk within the timeout to validate the stream works
         const iterable = provider.stream(request.messages, {
+          taskType: request.taskType,
           maxTokens: request.maxTokens,
           temperature: request.temperature,
           timeoutMs,
@@ -142,11 +161,19 @@ export class LLMGateway {
           yield result.value;
           result = await iterator.next();
         }
-        this.recordSuccess(provider.id, Date.now() - start);
+        const elapsedMs = Date.now() - start;
+        this.recordSuccess(provider.id, elapsedMs);
+        console.log(
+          `[LLM] stream-success task=${request.taskType} provider=${provider.id} model=${debugInfo.model ?? "unknown"} elapsedMs=${elapsedMs}`,
+        );
         return;
       } catch (err) {
-        this.recordError(provider.id, Date.now() - start);
+        const elapsedMs = Date.now() - start;
+        this.recordError(provider.id, elapsedMs);
         lastError = err;
+        console.error(
+          `[LLM] stream-error task=${request.taskType} provider=${provider.id} model=${debugInfo.model ?? "unknown"} elapsedMs=${elapsedMs} error=${formatError(err)}`,
+        );
         // fall through to next provider
       }
     }
@@ -211,4 +238,71 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   });
 }
 
+function formatError(err: unknown): string {
+  if (isAPIErrorLike(err)) {
+    const details: string[] = [];
+    if (err.name) details.push(`name=${err.name}`);
+    if (typeof err.status === "number") details.push(`status=${err.status}`);
+    if (err.type) details.push(`type=${err.type}`);
+    if (err.code) details.push(`code=${err.code}`);
+    if (err.param) details.push(`param=${err.param}`);
+    if (err.requestID) details.push(`requestID=${err.requestID}`);
 
+    const headerSummary = summarizeHeaders(err.headers);
+    if (headerSummary) details.push(`headers=${headerSummary}`);
+
+    const payload = summarizeErrorPayload(err.error);
+    if (payload) details.push(`payload=${payload}`);
+
+    return details.join(" ");
+  }
+
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
+interface APIErrorLike {
+  name?: string;
+  message?: string;
+  status?: number;
+  type?: string;
+  code?: string;
+  param?: string;
+  requestID?: string | null;
+  headers?: Headers;
+  error?: unknown;
+}
+
+function isAPIErrorLike(err: unknown): err is APIErrorLike {
+  return typeof err === "object" && err !== null && ("status" in err || "headers" in err);
+}
+
+function summarizeHeaders(headers: Headers | undefined): string {
+  if (!headers) return "";
+
+  const interesting = [
+    "x-request-id",
+    "x-should-retry",
+    "cf-ray",
+    "content-type",
+  ];
+  const present = interesting
+    .map((key) => {
+      const value = headers.get(key);
+      return value ? `${key}:${value}` : null;
+    })
+    .filter((value): value is string => value !== null);
+
+  return present.join(",");
+}
+
+function summarizeErrorPayload(payload: unknown): string {
+  if (!payload) return "";
+  if (typeof payload === "string") return payload;
+
+  try {
+    return JSON.stringify(payload);
+  } catch {
+    return String(payload);
+  }
+}

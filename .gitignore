@@ -5,6 +5,7 @@ dist/
 *.log
 *.tsbuildinfo
 .env
+.env.release.local
 
 # iOS / Xcode
 *.xcodeproj/xcuserdata/

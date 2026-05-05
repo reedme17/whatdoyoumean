@@ -6,6 +6,7 @@ export interface LLMMessage {
 
 /** Options passed to a provider adapter */
 export interface LLMOptions {
+  taskType?: LLMRequest["taskType"];
   maxTokens: number;
   temperature: number;
   timeoutMs: number;
@@ -54,6 +55,7 @@ export interface LLMProviderAdapter {
   id: string;
   name: string;
   isAvailable(): Promise<boolean>;
+  getDebugInfo?(): { model?: string; baseURL?: string };
   complete(
     messages: LLMMessage[],
     options: LLMOptions,

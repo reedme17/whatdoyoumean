@@ -7,7 +7,9 @@ import { useEffect, useRef, useCallback, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import type { ServerEvent } from "@wdym/shared";
 
-const WS_URL = (window as any).__WDYM_BACKEND_URL__ || "https://whatdoyoumean.onrender.com";
+// Local backend for desktop development.
+// const WS_URL = (window as any).__WDYM_BACKEND_URL__ || "https://whatdoyoumean.onrender.com";
+const WS_URL = "http://localhost:3000";
 
 export type ServerEventHandler = (event: ServerEvent) => void;
 
@@ -50,6 +52,7 @@ export function useSocket(onEvent: ServerEventHandler): UseSocketReturn {
       "session:state",
       "processing:progress",
       "session:summary",
+      "subtitle:result",
     ];
 
     for (const type of eventTypes) {

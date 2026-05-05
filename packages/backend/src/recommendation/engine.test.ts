@@ -4,6 +4,7 @@ import {
   type MemoryContext,
   type SessionContext,
 } from "./engine.js";
+import { RECOMMENDATION_TIMEOUT_MS } from "../config/timeouts.js";
 import type { LLMGateway } from "../llm/gateway.js";
 import type { LLMRequest, LLMResponse } from "../llm/types.js";
 import type {
@@ -123,7 +124,7 @@ describe("RecommendationEngine", () => {
       expect(recs.length).toBeLessThanOrEqual(3);
     });
 
-    it("sends request with recommendation taskType and 2s timeout", async () => {
+    it("sends request with recommendation taskType and configured timeout", async () => {
       let capturedRequest: LLMRequest | null = null;
       const gateway = {
         complete: async (request: LLMRequest): Promise<LLMResponse> => {
@@ -144,7 +145,7 @@ describe("RecommendationEngine", () => {
 
       expect(capturedRequest).not.toBeNull();
       expect(capturedRequest!.taskType).toBe("recommendation");
-      expect(capturedRequest!.timeoutMs).toBe(2000);
+      expect(capturedRequest!.timeoutMs).toBe(RECOMMENDATION_TIMEOUT_MS);
     });
 
     it("validates recommendation types, defaulting invalid to follow_up_question", async () => {

@@ -24,8 +24,25 @@ import { TextModeScreen } from "./components/TextModeScreen.js";
 import { ExpandPanel, type SessionSummary, type SttLanguage } from "./components/ExpandPanel.js";
 import { Onboarding } from "./components/Onboarding.js";
 import { DownloadPopover } from "./components/DownloadPopover.js";
+import { SubtitleSetupScreen, type SubtitleRegion } from "./components/SubtitleSetupScreen.js";
+import { SubtitleLiveScreen } from "./components/SubtitleLiveScreen.js";
+import { SubtitleResultScreen } from "./components/SubtitleResultScreen.js";
+import { createDesktopStream, stopMediaStream } from "./lib/desktop-stream.js";
+import { mergeSubtitleCapture } from "./lib/subtitle-dedupe.js";
 
-type Screen = "onboarding" | "home" | "live" | "recap" | "text" | "processing" ;
+type Screen = "onboarding" | "home" | "live" | "recap" | "text" | "processing" | "subtitleSetup" | "subtitleLive" | "subtitleResult";
+type SessionKind = "audio" | "text" | "subtitle";
+
+interface DesktopSource {
+  id: string;
+  name: string;
+}
+
+interface SubtitleCaptureConfig {
+  sourceId: string;
+  sourceName: string;
+  region: SubtitleRegion;
+}
 
 /** Minimal ElectronAPI type for window.electronAPI */
 interface ElectronAPI {
@@ -33,12 +50,37 @@ interface ElectronAPI {
   stopSession(): Promise<unknown>;
   pauseSession(): Promise<void>;
   resumeSession(): Promise<void>;
+  getDesktopSources?(): Promise<DesktopSource[]>;
+  getScreenPermission?(): Promise<string>;
+  runSubtitleOCR?(imageDataUrl: string): Promise<string>;
 }
 
 declare global {
   interface Window {
     electronAPI?: ElectronAPI;
   }
+}
+
+function toFriendlyErrorMessage(subsystem: string, rawMessage: string): string {
+  const message = rawMessage.toLowerCase();
+
+  if (subsystem === "recommendation") {
+    if (message.includes("429") || message.includes("ratelimit") || message.includes("rate limit")) {
+      return "Response recommendations are taking a short breather right now. Please try again in a moment.";
+    }
+    if (message.includes("timed out") || message.includes("timeout")) {
+      return "Response recommendations are taking a little longer than usual. Please try again in a moment.";
+    }
+    return "Response recommendations are temporarily unavailable. Please try again in a moment.";
+  }
+
+  if (message.includes("429") || message.includes("ratelimit") || message.includes("rate limit")) {
+    return "The analysis service is a little busy right now. Please try again in a moment.";
+  }
+  if (message.includes("timed out") || message.includes("timeout")) {
+    return "The analysis took longer than expected this time. Please try again in a moment.";
+  }
+  return "Something interrupted the analysis just now. Please try again in a moment.";
 }
 
 export function App(): React.JSX.Element {
@@ -49,6 +91,7 @@ export function App(): React.JSX.Element {
   const screenKeyRef = useRef(0);
   const [userId, setUserId] = useState<string | null>(null);
   const isGuest = userId === null;
+  const [sessionKind, setSessionKind] = useState<SessionKind>("audio");
 
   const goToScreen = useCallback((s: Screen) => {
     if (s === "home") screenKeyRef.current++;
@@ -69,17 +112,32 @@ export function App(): React.JSX.Element {
   const [responseEnabled, setResponseEnabled] = useState(true);
 
   const [pendingPreview, setPendingPreview] = useState<string>("");
+  const pendingPreviewClearTimerRef = useRef<number | null>(null);
+  const PENDING_PREVIEW_IDLE_CLEAR_MS = 10000;
   const [transcriptTexts, setTranscriptTexts] = useState<string[]>([]);
+  const lastRecommendationRequestKeyRef = useRef<string | null>(null);
 
   // ── Text mode state ──
   const [textCards, setTextCards] = useState<CoreMeaningCard[]>([]);
   const [textRecs, setTextRecs] = useState<Recommendation[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [processingStage, setProcessingStage] = useState("");
+  const [resultErrorMessage, setResultErrorMessage] = useState<string | null>(null);
+  const [recommendationErrorMessage, setRecommendationErrorMessage] = useState<string | null>(null);
 
   // ── Summary state ──
   const [sessionSummary, setSessionSummary] = useState("");
   const [textSummary, setTextSummary] = useState("");
+  const [screenPermissionStatus, setScreenPermissionStatus] = useState<string | null>(null);
+  const [subtitleConfig, setSubtitleConfig] = useState<SubtitleCaptureConfig | null>(null);
+  const [subtitleAccumulatedText, setSubtitleAccumulatedText] = useState("");
+  const [subtitleStatusMessage, setSubtitleStatusMessage] = useState("Waiting for first capture.");
+  const [subtitleCapturing, setSubtitleCapturing] = useState(false);
+  const [subtitlePendingText, setSubtitlePendingText] = useState("");
+  const subtitleStreamRef = useRef<MediaStream | null>(null);
+  const subtitleVideoRef = useRef<HTMLVideoElement | null>(null);
+  const subtitleCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const textAnalysisRequestIdRef = useRef(0);
 
   // ── Expand panel ──
   const [panelOpen, setPanelOpen] = useState(false);
@@ -95,6 +153,12 @@ export function App(): React.JSX.Element {
   recommendationsRef.current = recommendations;
   const transcriptTextsRef = useRef<string[]>([]);
   transcriptTextsRef.current = transcriptTexts;
+  const subtitleAccumulatedTextRef = useRef("");
+  subtitleAccumulatedTextRef.current = subtitleAccumulatedText;
+  const subtitlePendingTextRef = useRef("");
+  subtitlePendingTextRef.current = subtitlePendingText;
+  const textCardsRef = useRef<CoreMeaningCard[]>([]);
+  textCardsRef.current = textCards;
   const speakersRef = useRef<Map<string, string>>(new Map());
   speakersRef.current = speakers;
   const sessionSummaryRef = useRef("");
@@ -106,19 +170,19 @@ export function App(): React.JSX.Element {
     switch (event.type) {
       case "card:created": {
         const newCard = (event as Extract<ServerEvent, { type: "card:created" }>).card;
+        setResultErrorMessage(null);
         const s = screenRef.current;
         // Accept cards during live, text, or processing (waiting for final card)
-        if (s !== "live" && s !== "text" && s !== "processing") {
+        if (s !== "live" && s !== "text" && s !== "processing" && s !== "subtitleLive") {
           console.log("[App] Ignoring late card:created on screen:", s);
           break;
         }
-        if (s === "text") {
+        if (s === "text" || s === "subtitleLive") {
           setTextCards((prev) => [...prev, newCard]);
         } else {
           setCards((prev) => [...prev, newCard]);
         }
         setAnalyzing(false);
-        setPendingPreview("");
         break;
       }
 
@@ -145,6 +209,8 @@ export function App(): React.JSX.Element {
       }
 
       case "recommendation:new":
+        setRecommendationErrorMessage(null);
+        lastRecommendationRequestKeyRef.current = null;
         setRecommendations(
           (event as Extract<ServerEvent, { type: "recommendation:new" }>).recommendations
         );
@@ -173,7 +239,29 @@ export function App(): React.JSX.Element {
       }
 
       case "pending:preview":
-        setPendingPreview((event as Extract<ServerEvent, { type: "pending:preview" }>).text);
+        {
+          const nextPreview = (event as Extract<ServerEvent, { type: "pending:preview" }>).text ?? "";
+          if (pendingPreviewClearTimerRef.current !== null) {
+            window.clearTimeout(pendingPreviewClearTimerRef.current);
+            pendingPreviewClearTimerRef.current = null;
+          }
+
+          // Keep the last visible subtitle when the backend sends an empty
+          // preview during card finalization. We only clear it after a longer
+          // silence period with no new non-empty preview.
+          if (nextPreview.trim()) {
+            setPendingPreview(nextPreview);
+            pendingPreviewClearTimerRef.current = window.setTimeout(() => {
+              setPendingPreview("");
+              pendingPreviewClearTimerRef.current = null;
+            }, PENDING_PREVIEW_IDLE_CLEAR_MS);
+          } else if (pendingPreview) {
+            pendingPreviewClearTimerRef.current = window.setTimeout(() => {
+              setPendingPreview("");
+              pendingPreviewClearTimerRef.current = null;
+            }, PENDING_PREVIEW_IDLE_CLEAR_MS);
+          }
+        }
         break;
 
       case "session:state": {
@@ -212,10 +300,33 @@ export function App(): React.JSX.Element {
         setTextSummary(summaryText);
         break;
 
+      case "subtitle:result": {
+        const subtitleEvent = event as Extract<ServerEvent, { type: "subtitle:result" }>;
+        if (subtitleEvent.cards.length > 0) {
+          setTextCards((prev) => [...prev, ...subtitleEvent.cards]);
+        }
+        setSubtitlePendingText(subtitleEvent.pendingText ?? "");
+        setAnalyzing(false);
+        setSubtitleCapturing(false);
+        break;
+      }
+
+      case "error": {
+        const errorEvent = event as Extract<ServerEvent, { type: "error" }>;
+        const friendly = toFriendlyErrorMessage(errorEvent.subsystem, errorEvent.message);
+        if (errorEvent.subsystem === "recommendation") {
+          setRecommendationErrorMessage(friendly);
+        } else {
+          setResultErrorMessage(friendly);
+          setAnalyzing(false);
+        }
+        break;
+      }
+
       default:
         break;
     }
-  }, [currentCard]);
+  }, [currentCard, pendingPreview]);
 
   const { send } = useSocket(handleServerEvent);
 
@@ -226,12 +337,51 @@ export function App(): React.JSX.Element {
     }
   }, [responseEnabled, sttLanguage, screen, send]);
 
-  // When response is toggled on in text results, request recommendations
+  // Backfill recommendations whenever the user enables them after results already exist.
+  // This covers text mode plus live/recap flows where the initial generation was skipped or timed out.
   useEffect(() => {
-    if (screen === "text" && responseEnabled && textCards.length > 0 && textRecs.length === 0) {
+    const inTextResults =
+      screen === "text" &&
+      textCards.length > 0 &&
+      textRecs.length === 0;
+    const inAudioResults =
+      (screen === "live" || screen === "recap") &&
+      cards.length > 0 &&
+      recommendations.length === 0;
+
+    if (!responseEnabled) {
+      lastRecommendationRequestKeyRef.current = null;
+      return;
+    }
+
+    if (recommendationErrorMessage) {
+      return;
+    }
+
+    if (responseEnabled && (inTextResults || inAudioResults)) {
+      const requestKey =
+        screen === "text"
+          ? `text:${textCards.length}:${transcriptTexts.length}`
+          : `audio:${screen}:${cards.length}:${transcriptTexts.length}`;
+
+      if (lastRecommendationRequestKeyRef.current === requestKey) {
+        return;
+      }
+
+      lastRecommendationRequestKeyRef.current = requestKey;
       send({ type: "recommendations:request" });
     }
-  }, [responseEnabled, screen, textCards.length, textRecs.length, send]);
+  }, [
+    responseEnabled,
+    recommendationErrorMessage,
+    screen,
+    textCards.length,
+    textRecs.length,
+    cards.length,
+    recommendations.length,
+    transcriptTexts.length,
+    send,
+  ]);
 
   // ── Audio capture (renderer-side mic → base64 WAV → backend via WS) ──
   const { startCapture, stopCapture, isCapturing, error: audioError, analyser } = useAudioCapture({ send, mode: "online", audioSource });
@@ -271,6 +421,171 @@ export function App(): React.JSX.Element {
     });
   }, [textSummary, sessionSummary]);
 
+  const loadSubtitleSources = useCallback(async (): Promise<DesktopSource[]> => {
+    try {
+      const [sources, permission] = await Promise.all([
+        window.electronAPI?.getDesktopSources?.() ?? Promise.resolve([]),
+        window.electronAPI?.getScreenPermission?.() ?? Promise.resolve("unknown"),
+      ]);
+      setScreenPermissionStatus(permission);
+      return sources;
+    } catch (error) {
+      console.warn("[Subtitle] Unable to load desktop sources:", error);
+      setScreenPermissionStatus("unknown");
+      return [];
+    }
+  }, []);
+
+  const ensureSubtitleRuntime = useCallback(async (sourceId: string) => {
+    if (
+      subtitleStreamRef.current &&
+      subtitleVideoRef.current?.dataset.sourceId === sourceId
+    ) {
+      return;
+    }
+
+    stopMediaStream(subtitleStreamRef.current);
+    subtitleStreamRef.current = await createDesktopStream(sourceId);
+
+    const video = subtitleVideoRef.current ?? document.createElement("video");
+    video.muted = true;
+    video.playsInline = true;
+    video.dataset.sourceId = sourceId;
+    video.srcObject = subtitleStreamRef.current;
+    subtitleVideoRef.current = video;
+    await video.play();
+
+    subtitleCanvasRef.current = subtitleCanvasRef.current ?? document.createElement("canvas");
+  }, []);
+
+  const submitTextAnalysis = useCallback((text: string) => {
+    const requestId = ++textAnalysisRequestIdRef.current;
+    setAnalyzing(true);
+    setTextCards([]);
+    setTextRecs([]);
+    setTranscriptTexts([text]);
+    setResultErrorMessage(null);
+    setRecommendationErrorMessage(null);
+
+    send({ type: "session:start", config: { mode: "offline", sampleRate: 16000, channels: 1, noiseSuppression: false, autoGain: false, language: sttLanguage, responseEnabled } });
+
+    window.setTimeout(() => {
+      if (textAnalysisRequestIdRef.current !== requestId) return;
+      send({ type: "text:submit", text });
+    }, 200);
+
+    window.setTimeout(() => {
+      if (textAnalysisRequestIdRef.current !== requestId) return;
+      setAnalyzing((prev) => {
+        if (prev) {
+          const mockCard: CoreMeaningCard = {
+            id: "tc_" + Date.now(),
+            sessionId: "",
+            category: "fact",
+            content: text.slice(0, 100),
+            sourceSegmentIds: [],
+            linkedCardIds: [],
+            linkType: null,
+            topicId: "",
+            visualizationFormat: "concise_text",
+            isHighlighted: false,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+          setTextCards([mockCard]);
+        }
+        return false;
+      });
+    }, 10000);
+  }, [responseEnabled, send, sttLanguage]);
+
+  const captureSubtitleFrame = useCallback(async () => {
+    if (!subtitleConfig) return;
+    if (!window.electronAPI?.runSubtitleOCR) {
+      setResultErrorMessage("Subtitle OCR bridge is unavailable in this build.");
+      return;
+    }
+
+    setSubtitleCapturing(true);
+    setResultErrorMessage(null);
+    setSubtitleStatusMessage("Capturing subtitle region...");
+
+    try {
+      await ensureSubtitleRuntime(subtitleConfig.sourceId);
+      const video = subtitleVideoRef.current;
+      const canvas = subtitleCanvasRef.current;
+      if (!video || !canvas) {
+        throw new Error("Subtitle capture preview is not ready yet.");
+      }
+
+      const videoWidth = video.videoWidth;
+      const videoHeight = video.videoHeight;
+      if (!videoWidth || !videoHeight) {
+        throw new Error("Screen source is still warming up. Try capture again in a second.");
+      }
+
+      const region = subtitleConfig.region;
+      const sx = Math.round(region.x * videoWidth);
+      const sy = Math.round(region.y * videoHeight);
+      const sw = Math.round(region.width * videoWidth);
+      const sh = Math.round(region.height * videoHeight);
+      canvas.width = Math.max(1, sw * 2);
+      canvas.height = Math.max(1, sh * 2);
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) {
+        throw new Error("Unable to prepare subtitle capture canvas.");
+      }
+
+      ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const luminance = data[i] * 0.2126 + data[i + 1] * 0.7152 + data[i + 2] * 0.0722;
+        const boosted = luminance > 150 ? 255 : 0;
+        data[i] = boosted;
+        data[i + 1] = boosted;
+        data[i + 2] = boosted;
+      }
+      ctx.putImageData(imageData, 0, 0);
+
+      const imageDataUrl = canvas.toDataURL("image/png");
+      const rawText = await window.electronAPI.runSubtitleOCR(imageDataUrl);
+
+      if (!rawText.trim()) {
+        setSubtitleStatusMessage("No readable English subtitle text was detected in the selected region.");
+        return;
+      }
+
+      const mergeResult = mergeSubtitleCapture(subtitleAccumulatedTextRef.current, rawText);
+
+      if (!mergeResult.mergedScript.trim()) {
+        setSubtitleStatusMessage("OCR ran, but there is still no transcript content to merge.");
+        return;
+      }
+
+      setSubtitleAccumulatedText(mergeResult.mergedScript);
+      setTranscriptTexts([mergeResult.mergedScript]);
+      if (mergeResult.appendedText.trim()) {
+        setSubtitleStatusMessage("New subtitle lines captured. Running semantic analysis...");
+        setAnalyzing(true);
+        send({
+          type: "subtitle:analyze",
+          newText: mergeResult.appendedText,
+          pendingText: subtitlePendingTextRef.current,
+          existingCards: textCardsRef.current.slice(-5),
+        });
+      } else {
+        setSubtitleStatusMessage("No new subtitle lines found. The visible text matches the latest transcript.");
+      }
+    } catch (error) {
+      console.error("[Subtitle] capture failed:", error);
+      setResultErrorMessage(error instanceof Error ? error.message : String(error));
+      setSubtitleStatusMessage("Capture failed. See the latest error message and try again.");
+    } finally {
+      setSubtitleCapturing(false);
+    }
+  }, [ensureSubtitleRuntime, submitTextAnalysis, subtitleConfig]);
+
   // ── Handlers ──
 
   const handleLogin = (id: string) => {
@@ -286,6 +601,15 @@ export function App(): React.JSX.Element {
   };
 
   const resetSession = () => {
+    stopMediaStream(subtitleStreamRef.current);
+    subtitleStreamRef.current = null;
+    if (subtitleVideoRef.current) {
+      subtitleVideoRef.current.srcObject = null;
+    }
+    if (pendingPreviewClearTimerRef.current !== null) {
+      window.clearTimeout(pendingPreviewClearTimerRef.current);
+      pendingPreviewClearTimerRef.current = null;
+    }
     setCards([]);
     setCurrentCard(null);
     setRecommendations([]);
@@ -299,10 +623,19 @@ export function App(): React.JSX.Element {
     setSpeakers(new Map());
     setSessionSummary("");
     setTextSummary("");
+    setResultErrorMessage(null);
+    setRecommendationErrorMessage(null);
+    setSubtitleConfig(null);
+    setSubtitleAccumulatedText("");
+    setSubtitlePendingText("");
+    setSubtitleStatusMessage("Waiting for first capture.");
+    setSubtitleCapturing(false);
+    textAnalysisRequestIdRef.current = 0;
   };
 
   const handleStart = async () => {
     resetSession();
+    setSessionKind("audio");
     sessionStartRef.current = Date.now();
     goToScreen("live");
 
@@ -391,49 +724,64 @@ export function App(): React.JSX.Element {
   };
 
   const handleTextAnalyze = async (text: string) => {
-    setAnalyzing(true);
+    setSessionKind("text");
+    submitTextAnalysis(text);
+  };
+
+  const handleOpenSubtitleSetup = async () => {
+    resetSession();
+    setSessionKind("subtitle");
+    const sources = await loadSubtitleSources();
+    if (sources.length === 0) {
+      setResultErrorMessage("No screen source is available for subtitle capture right now.");
+      goToScreen("home");
+      return;
+    }
+    const preferredSource =
+      sources.find((source) => source.id.startsWith("screen:")) ??
+      sources.find((source) => /entire screen|screen/i.test(source.name)) ??
+      sources[0];
+    setSubtitleConfig({
+      sourceId: preferredSource.id,
+      sourceName: preferredSource.name,
+      region: { x: 0.12, y: 0.72, width: 0.76, height: 0.18 },
+    });
+    goToScreen("subtitleSetup");
+  };
+
+  const handleSubtitleConfirm = async (config: SubtitleCaptureConfig) => {
+    setSubtitleConfig(config);
+    setSubtitleAccumulatedText("");
+    setSubtitleStatusMessage("Waiting for first capture.");
+    setTranscriptTexts([]);
     setTextCards([]);
     setTextRecs([]);
-    setTranscriptTexts([text]);
+    setTextSummary("");
+    setResultErrorMessage(null);
+    setRecommendationErrorMessage(null);
+    goToScreen("subtitleLive");
 
-    // Start a text-mode session first, then submit text
-    send({ type: "session:start", config: { mode: "offline", sampleRate: 16000, channels: 1, noiseSuppression: false, autoGain: false, language: sttLanguage, responseEnabled } });
+    try {
+      await ensureSubtitleRuntime(config.sourceId);
+    } catch (error) {
+      console.warn("[Subtitle] runtime warmup failed:", error);
+    }
+  };
 
-    // Small delay to let session initialize, then submit text
-    setTimeout(() => {
-      send({ type: "text:submit", text });
-    }, 200);
-
-    // Wait for results via WebSocket (handled by handleServerEvent)
-    // Set a timeout to show mock results if nothing comes back
-    setTimeout(() => {
-      setAnalyzing((prev) => {
-        if (prev) {
-          // No results came back — show the text as a basic card
-          const mockCard: CoreMeaningCard = {
-            id: "tc_" + Date.now(),
-            sessionId: "",
-            category: "fact",
-            content: text.slice(0, 100),
-            sourceSegmentIds: [],
-            linkedCardIds: [],
-            linkType: null,
-            topicId: "",
-            visualizationFormat: "concise_text",
-            isHighlighted: false,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          };
-          setTextCards([mockCard]);
-        }
-        return false;
-      });
-    }, 10000); // 10s timeout
+  const handleSubtitleEnd = () => {
+    stopMediaStream(subtitleStreamRef.current);
+    subtitleStreamRef.current = null;
+    if (subtitleVideoRef.current) {
+      subtitleVideoRef.current.srcObject = null;
+      delete subtitleVideoRef.current.dataset.sourceId;
+    }
+    goToScreen("subtitleResult");
   };
 
   const handleExport = () => {
-    const allCards = screen === "text" ? textCards : cards;
-    const allRecs = screen === "text" ? textRecs : recommendations;
+    const useTextResults = screen === "text" || screen === "subtitleLive" || sessionKind === "subtitle";
+    const allCards = useTextResults ? textCards : cards;
+    const allRecs = useTextResults ? textRecs : recommendations;
     const sections = [
       "# WDYM - 啥意思\n",
       ...allCards.map((c) => `- **[${c.category}]** ${c.content}`),
@@ -449,8 +797,9 @@ export function App(): React.JSX.Element {
   };
 
   const handleExportMd = () => {
-    const allCards = screen === "text" ? textCards : cards;
-    const allRecs = screen === "text" ? textRecs : recommendations;
+    const useTextResults = screen === "text" || screen === "subtitleLive" || sessionKind === "subtitle";
+    const allCards = useTextResults ? textCards : cards;
+    const allRecs = useTextResults ? textRecs : recommendations;
     const now = new Date();
     const dateStr = now.toISOString().slice(0, 10);
     const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, "");
@@ -461,7 +810,7 @@ export function App(): React.JSX.Element {
     ];
 
     // Analysis results — group cards by speaker runs (same as RecapScreen)
-    const isAudioMode = screen !== "text";
+    const isAudioMode = sessionKind === "audio";
     sections.push("## Analysis\n");
 
     if (isAudioMode) {
@@ -608,6 +957,7 @@ export function App(): React.JSX.Element {
             resetSession();
             goToScreen("text");
           }}
+          onSubtitleMode={handleOpenSubtitleSetup}
           onExpand={() => setPanelOpen(true)}
           panelOpen={panelOpen}
         />
@@ -689,6 +1039,8 @@ export function App(): React.JSX.Element {
           onToggleMark={(cardId) => {
             setCards((prev) => prev.map((c) => c.id === cardId ? { ...c, isHighlighted: !c.isHighlighted } : c));
           }}
+          resultErrorMessage={resultErrorMessage}
+          recommendationErrorMessage={recommendationErrorMessage}
         />
         </div>
       )}
@@ -716,7 +1068,59 @@ export function App(): React.JSX.Element {
             setTextCards((prev) => prev.map((c) => c.id === cardId ? { ...c, isHighlighted: !c.isHighlighted } : c));
           }}
           summary={textSummary}
+          resultErrorMessage={resultErrorMessage}
+          recommendationErrorMessage={recommendationErrorMessage}
         />
+        </div>
+      )}
+
+      {screen === "subtitleSetup" && (
+        <div key="subtitle-setup" className="screen-enter h-full">
+          <SubtitleSetupScreen
+            source={subtitleConfig ? { id: subtitleConfig.sourceId, name: subtitleConfig.sourceName } : null}
+            permissionStatus={screenPermissionStatus}
+            onConfirm={handleSubtitleConfirm}
+            onClose={() => {
+              resetSession();
+              goToScreen("home");
+            }}
+          />
+        </div>
+      )}
+
+      {screen === "subtitleLive" && subtitleConfig && (
+        <div key="subtitle-live" className="screen-enter h-full">
+          <SubtitleLiveScreen
+            sourceId={subtitleConfig.sourceId}
+            sourceName={subtitleConfig.sourceName}
+            region={subtitleConfig.region}
+            statusMessage={subtitleStatusMessage}
+            accumulatedText={subtitleAccumulatedText}
+            cards={textCards}
+            isCapturing={subtitleCapturing}
+            analyzing={analyzing}
+            onCapture={captureSubtitleFrame}
+            onEnd={handleSubtitleEnd}
+          />
+        </div>
+      )}
+
+      {screen === "subtitleResult" && (
+        <div key="subtitle-result" className="h-full">
+          <SubtitleResultScreen
+            cards={textCards}
+            accumulatedText={subtitleAccumulatedText}
+            onClose={() => {
+              resetSession();
+              goToScreen("home");
+            }}
+            onCopy={handleExport}
+            onExportMd={handleExportMd}
+            onToggleMark={(cardId) => {
+              setTextCards((prev) => prev.map((c) => c.id === cardId ? { ...c, isHighlighted: !c.isHighlighted } : c));
+            }}
+            resultErrorMessage={resultErrorMessage}
+          />
         </div>
       )}
 

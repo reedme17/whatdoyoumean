@@ -129,6 +129,7 @@ export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false
   }, []);
   const speakerRef = useRef<HTMLSpanElement>(null);
   const textRef = useRef<HTMLSpanElement>(null);
+  const textViewportRef = useRef<HTMLDivElement>(null);
   const prevPreviewRef = useRef("");
   const animatingRef = useRef(false);
   const lastHeightRef = useRef(0);
@@ -213,8 +214,26 @@ export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false
     return () => ro.disconnect();
   }, []);
 
-  // Determine text to show (current or keep last during exit animation)
-  const textToShow = pendingPreview || prevPreviewRef.current || "";
+  // Determine text to show (current or keep last during exit animation).
+  // We intentionally render only a moving preview window instead of the entire
+  // pending transcript so the live UI feels like a subtitle line rather than a
+  // growing paragraph. The backend still keeps the full pending text for card
+  // generation and segmentation.
+  const textToShow = getPreviewWindow(pendingPreview || prevPreviewRef.current || "");
+
+  useEffect(() => {
+    const viewport = textViewportRef.current;
+    const textEl = textRef.current;
+    if (!viewport || !textEl) return;
+
+    const overflow = Math.max(0, textEl.scrollWidth - viewport.clientWidth);
+    gsap.to(textEl, {
+      x: overflow > 0 ? -overflow : 0,
+      duration: 0.45,
+      ease: "power2.out",
+      overwrite: "auto",
+    });
+  }, [textToShow]);
 
   return (
     <div
@@ -237,18 +256,24 @@ export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false
       >
         <span ref={speakerRef} className="font-sans font-semibold text-sm text-[#60594D]" style={{ display: "none" }}>
         </span>
-        <span ref={textRef} className="font-sans font-medium text-sm text-[#171717]">
-          {(pendingPreview || textToShow).split("").map((char, i) => (
-            <span
-              key={i}
-              data-char
-              style={{ display: "inline-block", whiteSpace: "pre" }}
-            >
-              {char}
-            </span>
-          ))}
-          <span data-char style={{ display: "inline-block" }}>...</span>
-        </span>
+        <div
+          ref={textViewportRef}
+          className="w-full overflow-hidden"
+          style={{ whiteSpace: "nowrap" }}
+        >
+          <span ref={textRef} className="inline-block font-sans font-medium text-sm text-[#171717] whitespace-nowrap will-change-transform">
+            {textToShow.split("").map((char, i) => (
+              <span
+                key={i}
+                data-char
+                style={{ display: "inline-block", whiteSpace: "pre" }}
+              >
+                {char}
+              </span>
+            ))}
+            <span data-char style={{ display: "inline-block" }}>...</span>
+          </span>
+        </div>
       </div>
 
       {/* Controls row */}
@@ -314,4 +339,23 @@ export function BottomBar({ onFlag, onStop, analyser = null, isCapturing = false
       </div>
     </div>
   );
+}
+
+function getPreviewWindow(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed) return "";
+
+  const maxChars = 72;
+
+  // Prefer the most recent clause/sentence so the bar behaves like a moving
+  // caption instead of repeating the full buffered utterance.
+  const parts = trimmed
+    .split(/(?<=[。！？.!?,，])/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  const candidate = parts.length > 0 ? parts[parts.length - 1] : trimmed;
+  if (candidate.length <= maxChars) return candidate;
+
+  return candidate.slice(-maxChars).trimStart();
 }

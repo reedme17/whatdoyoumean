@@ -13,7 +13,7 @@ export class DeepgramProvider {
   async transcribeBase64Wav(
     audioBase64: string,
     language?: string,
-  ): Promise<{ text: string; speaker: number; latencyMs: number }> {
+  ): Promise<{ text: string; speaker: number; latencyMs: number; words: DeepgramWord[] }> {
     const apiKey = process.env.DEEPGRAM_API_KEY;
     if (!apiKey) throw new Error("Deepgram API key not configured");
 
@@ -55,7 +55,14 @@ export class DeepgramProvider {
           alternatives?: {
             transcript?: string;
             confidence?: number;
-            words?: { speaker?: number }[];
+            words?: {
+              word?: string;
+              punctuated_word?: string;
+              speaker?: number;
+              start?: number;
+              end?: number;
+              confidence?: number;
+            }[];
           }[];
         }[];
       };
@@ -63,15 +70,32 @@ export class DeepgramProvider {
 
     const alt = result?.results?.channels?.[0]?.alternatives?.[0];
     const text = alt?.transcript ?? "";
+    const words: DeepgramWord[] = (alt?.words ?? []).map((w) => ({
+      word: w.word ?? "",
+      punctuatedWord: w.punctuated_word ?? w.word ?? "",
+      speaker: w.speaker ?? 0,
+      start: w.start,
+      end: w.end,
+      confidence: w.confidence,
+    }));
     const speaker = alt?.words?.[0]?.speaker ?? 0;
     const confidence = alt?.confidence ?? 0;
 
     if (confidence < 0.3 || !text.trim()) {
       console.log(`[Deepgram] Low confidence (${confidence.toFixed(3)}) or empty — dropping: "${text.slice(0, 40)}"`);
-      return { text: "", speaker: 0, latencyMs };
+      return { text: "", speaker: 0, latencyMs, words: [] };
     }
 
     console.log(`[Deepgram] Transcribed in ${latencyMs}ms (speaker ${speaker}, conf ${confidence.toFixed(3)}): "${text.slice(0, 80)}"`);
-    return { text, speaker, latencyMs };
+    return { text, speaker, latencyMs, words };
   }
+}
+
+export interface DeepgramWord {
+  word: string;
+  punctuatedWord: string;
+  speaker: number;
+  start?: number;
+  end?: number;
+  confidence?: number;
 }

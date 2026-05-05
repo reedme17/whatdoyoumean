@@ -31,6 +31,7 @@ export type ClientEvent =
   | { type: 'session:end' }
   | { type: 'audio:chunk'; data: AudioChunk }
   | { type: 'text:submit'; text: string }
+  | { type: 'subtitle:analyze'; newText: string; pendingText: string; existingCards: CoreMeaningCard[] }
   | { type: 'speaker:rename'; speakerId: string; name: string }
   | { type: 'bookmark:create'; timestamp: number; note?: string };
 
@@ -49,4 +50,5 @@ export type ServerEvent =
   | { type: 'error'; subsystem: string; message: string; recoverable: boolean }
   | { type: 'session:state'; state: 'active' | 'paused' | 'ended' }
   | { type: 'processing:progress'; stage: string }
-  | { type: 'session:summary'; summary: string };
+  | { type: 'session:summary'; summary: string }
+  | { type: 'subtitle:result'; cards: CoreMeaningCard[]; pendingText: string };

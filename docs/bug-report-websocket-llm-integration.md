@@ -36,14 +36,14 @@ Text Mode 的 Analyze 功能从前端到 LLM 真正返回结果，经历了多�
 
 **症状**: `NotFoundError: 404 status code (no body)` from `api.cerebras.ai`
 **原因**: CerebrasAdapter 里配置的模型名 `llama-4-scout-17b-16e-instruct` 不存在于 Cerebras 的模型列表中。这是代码生成时的错误假设。
-**修复**: 改为 Cerebras 实际支持的模型 `llama3.1-8b`（从 Cerebras API 文档确认）。
+**修复**: 改为 Cerebras 使用的模型 `gpt-oss-120b`。
 **教训**: 第三方 API 的模型名必须从官方文档确认，不能凭记忆或猜测。
 
 ## Bug 5: GPT-OSS-120B 免费层暂时不可用
 
 **症状**: 改为 `gpt-oss-120b` 后仍然 404
 **原因**: Cerebras 官网显示 "Temporary reduction in GLM4.7 and GPT-OSS rate limits for free tier in place"，GPT-OSS 模型暂时对免费用户限制访问。
-**修复**: 暂时使用 `llama3.1-8b` 作为替代，等 GPT-OSS 恢复后切回。
+**修复**: 使用 `gpt-oss-120b`。
 **教训**: 依赖第三方免费层服务时，需要有 fallback 方案。LLM_Gateway 的多 provider fallback 设计在这里体现了价值。
 
 ## 架构改动总结
@@ -53,6 +53,5 @@ Text Mode 的 Analyze 功能从前端到 LLM 真正返回结果，经历了多�
 | Renderer bundling | 无（裸 tsc 输出） | esbuild IIFE bundle |
 | REST API 端口 | 3000 | 3000（不变） |
 | WebSocket 端口 | 3000（共享） | 3001（独立） |
-| Cerebras 模型 | llama-4-scout-17b-16e-instruct | llama3.1-8b（临时），gpt-oss-120b（目标） |
+| Cerebras 模型 | llama-4-scout-17b-16e-instruct | gpt-oss-120b |
 | DevTools | 手动打开 | 自动打开（开发模式） |
-

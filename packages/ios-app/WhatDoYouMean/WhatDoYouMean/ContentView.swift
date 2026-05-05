@@ -56,3 +56,20 @@ struct ContentView: View {
         .animation(.easeOut(duration: 0.3), value: appState.screen)
     }
 }
+private struct ContentViewPreviewHost: View {
+    @State private var appState = AppState()
+    @State private var coordinator = SessionCoordinator()
+
+    var body: some View {
+        ContentView()
+            .environment(appState)
+            .environment(coordinator)
+            .onAppear {
+                coordinator.bind(to: appState)
+            }
+    }
+}
+
+#Preview {
+    ContentViewPreviewHost()
+}

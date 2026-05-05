@@ -66,32 +66,32 @@ export function CoreMeaningCardView({
 
   return (
     <div
-      className="group flex gap-[8px] items-baseline text-[#60594D] relative"
+      className="group flex gap-[8px] items-center text-[#60594D] relative"
       style={{ animation: "fadeInUp 0.3s ease-out" }}
     >
-      {/* Category — italic 11px */}
-      <span
-        className="font-sans italic text-[11px] whitespace-nowrap shrink-0 inline-block"
-        style={badgeWidth ? { width: badgeWidth } : { width: 48 }}
-      >
-        {categoryLabels[card.category]}
-      </span>
+      <div className="flex items-baseline gap-[8px] flex-1 min-w-0">
+        {/* Category — italic 11px */}
+        <span
+          className="font-sans italic text-[11px] whitespace-nowrap shrink-0 inline-block"
+          style={badgeWidth ? { width: badgeWidth } : { width: 48 }}
+        >
+          {categoryLabels[card.category]}
+        </span>
 
-      {/* Content — medium 14px */}
-      {editing ? (
-        <div className="flex gap-2 flex-1">
-          <Input
-            className="flex-1 text-sm"
-            value={editText}
-            onChange={(e) => setEditText(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSave()}
-            autoFocus
-            aria-label="Edit card content"
-          />
-          <Button variant="outline" size="sm" onClick={handleSave}>Save</Button>
-        </div>
-      ) : (
-        <>
+        {/* Content — medium 14px */}
+        {editing ? (
+          <div className="flex gap-2 flex-1">
+            <Input
+              className="flex-1 text-sm"
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSave()}
+              autoFocus
+              aria-label="Edit card content"
+            />
+            <Button variant="outline" size="sm" onClick={handleSave}>Save</Button>
+          </div>
+        ) : (
           <span
             className={`font-sans font-medium text-sm ${editable ? "cursor-pointer hover:text-muted transition-colors" : ""} ${
               markAnimating === "mark" ? "highlighter-mark animate-draw-mark" :
@@ -104,27 +104,28 @@ export function CoreMeaningCardView({
           >
             {card.content}
           </span>
-          {onToggleMark && (
-            <button
-              className="opacity-0 group-hover:opacity-100 transition-opacity ml-auto shrink-0 text-[#93918E] hover:text-[#60594D] bg-transparent border-none cursor-pointer p-0"
-              onClick={handleToggleMark}
-              title={card.isHighlighted ? "Remove mark" : "Mark moment"}
-            >
-              {card.isHighlighted ? (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" />
-                  <path d="M9 10h6" />
-                </svg>
-              ) : (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" />
-                  <path d="M9 10h6" />
-                  <path d="M12 7v6" />
-                </svg>
-              )}
-            </button>
+        )}
+      </div>
+
+      {!editing && onToggleMark && (
+        <button
+          className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 self-center text-[#93918E] hover:text-[#60594D] bg-transparent border-none cursor-pointer p-0"
+          onClick={handleToggleMark}
+          title={card.isHighlighted ? "Remove mark" : "Mark moment"}
+        >
+          {card.isHighlighted ? (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" />
+              <path d="M9 10h6" />
+            </svg>
+          ) : (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" />
+              <path d="M9 10h6" />
+              <path d="M12 7v6" />
+            </svg>
           )}
-        </>
+        </button>
       )}
     </div>
   );

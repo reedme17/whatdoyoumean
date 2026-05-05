@@ -1,5 +1,6 @@
 import type { LLMGateway } from "../llm/gateway.js";
 import type { LLMResponse } from "../llm/types.js";
+import { RECOMMENDATION_TIMEOUT_MS } from "../config/timeouts.js";
 import type {
   CoreMeaningCard,
   Recommendation,
@@ -24,8 +25,8 @@ export interface SessionContext {
 
 // ── constants ────────────────────────────────────────────────────
 
-const RECOMMENDATION_TIMEOUT_MS = 2000;
 const TOPIC_STALE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+const RECOMMENDATION_MAX_TOKENS = 180;
 
 const VALID_TYPES: RecommendationType[] = [
   "follow_up_question",
@@ -49,7 +50,7 @@ export class RecommendationEngine {
   }
 
   /**
-   * Generate 1-3 recommendations for a given card within a 2-second budget.
+   * Generate 1-3 recommendations for a given card within the configured budget.
    * Accepts optional MemoryContext for personalized suggestions.
    */
   async generateRecommendations(
@@ -75,8 +76,8 @@ export class RecommendationEngine {
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: prompt },
       ],
-      maxTokens: 400,
-      temperature: 0.7,
+      maxTokens: RECOMMENDATION_MAX_TOKENS,
+      temperature: 0.2,
       stream: false,
       timeoutMs: RECOMMENDATION_TIMEOUT_MS,
     });

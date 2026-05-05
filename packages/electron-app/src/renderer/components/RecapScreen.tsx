@@ -25,6 +25,7 @@ interface Props {
   onEditCard: (cardId: string, content: string) => void;
   title?: string;
   actionLabel?: string;
+  showAction?: boolean;
   showSpeakers?: boolean;
   speakerName?: string;
   responseEnabled?: boolean;
@@ -35,6 +36,8 @@ interface Props {
   onGroupOverridesChange?: (overrides: Map<number, { speakerKey: string; name: string }>) => void;
   onToggleMark?: (cardId: string) => void;
   summary?: string;
+  resultErrorMessage?: string | null;
+  recommendationErrorMessage?: string | null;
 }
 
 export function RecapScreen({
@@ -48,6 +51,7 @@ export function RecapScreen({
   onEditCard,
   title = "Session recap",
   actionLabel = "New session",
+  showAction = true,
   showSpeakers = true,
   speakerName,
   responseEnabled = false,
@@ -57,6 +61,8 @@ export function RecapScreen({
   onGroupOverridesChange,
   onToggleMark,
   summary,
+  resultErrorMessage,
+  recommendationErrorMessage,
 }: Props): React.JSX.Element {
   // Suppress hover on X icon for 300ms after mount (End button overlaps X position)
   const [xReady, setXReady] = useState(false);
@@ -246,7 +252,7 @@ export function RecapScreen({
 
           {cards.length === 0 && (
             <div className="text-sm text-center mt-16 font-sans text-[#93918E]">
-              Nothing was captured in this session.
+              {resultErrorMessage ?? "Nothing was captured in this session."}
             </div>
           )}
 
@@ -254,6 +260,11 @@ export function RecapScreen({
           {responseEnabled && recommendations.length > 0 && (
             <div className="px-[20px] -mt-[8px]">
               <RecommendationTokens recommendations={recommendations} />
+            </div>
+          )}
+          {responseEnabled && recommendations.length === 0 && recommendationErrorMessage && cards.length > 0 && (
+            <div className="px-[20px] -mt-[4px]">
+              <p className="font-sans text-sm text-[#93918E] leading-relaxed">{recommendationErrorMessage}</p>
             </div>
           )}
         </div>
@@ -272,12 +283,14 @@ export function RecapScreen({
         </div>
       )}      {/* Bottom bar */}
       <div className="flex items-center justify-between px-[20px] pt-[12px] pb-[20px] shrink-0">
-        <button
-          className="font-sans font-bold text-sm text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0"
-          onClick={onAction ?? onClose}
-        >
-          {actionLabel}
-        </button>
+        {showAction && (
+          <button
+            className="font-sans font-bold text-sm text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0"
+            onClick={onAction ?? onClose}
+          >
+            {actionLabel}
+          </button>
+        )}
         <div className="flex items-center gap-4">
           {onResponseEnabledChange && (
           <Popover>

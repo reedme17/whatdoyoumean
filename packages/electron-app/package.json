@@ -6,11 +6,12 @@
   "private": true,
   "main": "./dist/main/index.js",
   "scripts": {
-    "build": "tsc --build tsconfig.main.json && node build-renderer.mjs && cp src/renderer/index.html dist/renderer/index.html",
+    "build": "node ../../node_modules/typescript/bin/tsc --build tsconfig.main.json && node build-renderer.mjs && cp src/renderer/index.html dist/renderer/index.html",
     "clean": "rm -rf dist tsconfig.tsbuildinfo tsconfig.main.tsbuildinfo tsconfig.renderer.tsbuildinfo",
-    "start": "electron ./dist/main/index.js",
-    "pack": "electron-builder --dir",
-    "dist": "electron-builder"
+    "start": "node ../../node_modules/electron/cli.js ./dist/main/index.js",
+    "pack": "node ../../node_modules/electron-builder/cli.js --dir",
+    "dist": "node ../../node_modules/electron-builder/cli.js",
+    "release:mac": "bash ./scripts/release-mac.sh"
   },
   "build": {
     "appId": "com.wdym.app",
@@ -21,6 +22,7 @@
         "dmg"
       ],
       "icon": "src/renderer/assets/WDYM.icon/Assets/icon.png",
+      "hardenedRuntime": true,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "extendInfo": {

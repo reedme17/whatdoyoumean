@@ -10,6 +10,16 @@ export interface DeepgramStreamResult {
   isFinal: boolean;
   speaker: number;
   confidence: number;
+  words: DeepgramWord[];
+}
+
+export interface DeepgramWord {
+  word: string;
+  punctuatedWord: string;
+  speaker: number;
+  start?: number;
+  end?: number;
+  confidence?: number;
 }
 
 export type OnResultCallback = (result: DeepgramStreamResult) => void;
@@ -88,14 +98,28 @@ export class DeepgramStreamingProvider {
           const confidence = alt.confidence ?? 0;
           const isFinal = msg.is_final === true;
           // Collect all unique speakers from words array
-          const words = alt.words ?? [];
-          const speakerSet = new Set(words.map((w: { speaker?: number }) => w.speaker).filter((s: number | undefined) => s !== undefined));
+          const words: DeepgramWord[] = (alt.words ?? []).map((w: {
+            word?: string;
+            punctuated_word?: string;
+            speaker?: number;
+            start?: number;
+            end?: number;
+            confidence?: number;
+          }) => ({
+            word: w.word ?? "",
+            punctuatedWord: w.punctuated_word ?? w.word ?? "",
+            speaker: w.speaker ?? 0,
+            start: w.start,
+            end: w.end,
+            confidence: w.confidence,
+          }));
+          const speakerSet = new Set(words.map((w) => w.speaker));
           const speaker = words[0]?.speaker ?? 0;
           if (isFinal && text.trim()) {
             console.log(`[DeepgramStream] Result: final=${isFinal} speaker=${speaker} speakers=[${[...speakerSet]}] words=${words.length} text="${text.slice(0, 40)}"`);
           }
           if (text.trim()) {
-            this.onResult?.({ text, isFinal, speaker, confidence });
+            this.onResult?.({ text, isFinal, speaker, confidence, words });
           }
         } else if (msg.type === "UtteranceEnd") {
           console.log("[DeepgramStream] Utterance end");

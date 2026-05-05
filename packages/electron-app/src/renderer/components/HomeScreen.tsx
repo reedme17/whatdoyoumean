@@ -7,16 +7,17 @@ import React, { useState, useCallback, useRef } from "react";
 import { motion, useAnimation } from "motion/react";
 import { KeyboardIcon } from "./ui/keyboard-icon.js";
 import { Menu } from "lucide-react";
-import type { SttLanguage } from "./ExpandPanel.js";
+import { SubtitleRegionIcon } from "./ui/subtitle-region-icon.js";
 
 interface Props {
   onStart: () => void;
   onTextMode: () => void;
+  onSubtitleMode: () => void;
   onExpand: () => void;
   panelOpen: boolean;
 }
 
-export function HomeScreen({ onStart, onTextMode, onExpand, panelOpen }: Props): React.JSX.Element {
+export function HomeScreen({ onStart, onTextMode, onSubtitleMode, onExpand, panelOpen }: Props): React.JSX.Element {
   const [transitioning, setTransitioning] = useState(false);
   const [morphStyle, setMorphStyle] = useState<React.CSSProperties | null>(null);
   const [placeholderSize, setPlaceholderSize] = useState<{ w: number; h: number } | null>(null);
@@ -126,6 +127,15 @@ export function HomeScreen({ onStart, onTextMode, onExpand, panelOpen }: Props):
             style={kbFixedStyle ?? undefined}
           >
             <KeyboardIcon size={20} />
+          </motion.button>
+          <motion.button
+            className="text-muted hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-0 shrink-0"
+            onClick={onSubtitleMode}
+            aria-label="Open subtitle capture mode"
+            title="Subtitle Capture"
+            animate={textControls}
+          >
+            <SubtitleRegionIcon size={20} />
           </motion.button>
         </div>
       </div>

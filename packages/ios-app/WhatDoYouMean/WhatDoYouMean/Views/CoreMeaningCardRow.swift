@@ -13,30 +13,32 @@ struct CoreMeaningCardRow: View {
     private static let highlightColor = Color(red: 1, green: 0.9, blue: 0).opacity(0.28)
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: Tokens.Spacing.sm) {
-            // Category label — italic 11px
-            Text(card.category.label)
-                .font(Tokens.Fonts.sans(size: 11, weight: .regular).italic())
-                .foregroundStyle(Tokens.Colors.warmText)
-                .frame(width: 60, alignment: .leading)
+        HStack(alignment: .center, spacing: Tokens.Spacing.sm) {
+            HStack(alignment: .firstTextBaseline, spacing: Tokens.Spacing.sm) {
+                // Category label — italic 11px
+                Text(card.category.label)
+                    .font(Tokens.Fonts.sans(size: 11, weight: .regular).italic())
+                    .foregroundStyle(Tokens.Colors.warmText)
+                    .frame(width: 60, alignment: .leading)
 
-            // Content — medium 14px with animated highlight
-            Text(card.content)
-                .font(Tokens.Fonts.sans(size: Tokens.FontSize.sm, weight: .medium))
-                .foregroundStyle(Tokens.Colors.warmText)
-                .padding(.horizontal, 3)
-                .padding(.vertical, 1)
-                .background(
-                    GeometryReader { geo in
-                        Self.highlightColor
-                            .frame(width: geo.size.width * highlightProgress)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                )
+                // Content — medium 14px with animated highlight
+                Text(card.content)
+                    .font(Tokens.Fonts.sans(size: Tokens.FontSize.sm, weight: .medium))
+                    .foregroundStyle(Tokens.Colors.warmText)
+                    .padding(.horizontal, 3)
+                    .padding(.vertical, 1)
+                    .background(
+                        GeometryReader { geo in
+                            Self.highlightColor
+                                .frame(width: geo.size.width * highlightProgress)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    )
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             // Mark toggle (recap only)
             if let onToggleMark {
-                Spacer(minLength: 4)
                 Button {
                     handleToggle(onToggleMark)
                 } label: {

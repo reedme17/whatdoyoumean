@@ -40,6 +40,8 @@ interface AnalysisResult {
 const MAX_ENGLISH_WORDS = 30;
 const MAX_CHINESE_CHARS = 50;
 const ANALYSIS_TIMEOUT_MS = 5000;
+const MULTI_ANALYSIS_MAX_TOKENS = 220;
+const MULTI_ANALYSIS_TIMEOUT_MS = 15000;
 
 const VALID_CATEGORIES: MeaningCategory[] = [
   "fact",
@@ -127,19 +129,28 @@ export class SemanticAnalyzer {
   async analyzeMulti(text: string, languageCode: "zh" | "en"): Promise<CoreMeaningCard[]> {
     console.log("[SemanticAnalyzer] analyzeMulti calling LLM...");
     const hasMarked = text.includes("⭐IMPORTANT");
+    const maxItems = inferMaxItems(text);
+    const langLabel = languageCode === "zh" ? "Chinese" : "English";
     const userPrompt = hasMarked
-      ? `Analyze this text and extract all distinct points. Lines prefixed with ⭐IMPORTANT were explicitly marked by the user as critical — each MUST produce its own item and MUST NOT be dropped or merged away:\n\n${text}`
-      : `Analyze this text and extract all distinct points:\n\n${text}`;
+      ? `Language: ${langLabel}
+Return at most ${maxItems} items.
+Each ⭐IMPORTANT line must produce its own item.
+Input:
+${text}`
+      : `Language: ${langLabel}
+Return at most ${maxItems} items.
+Input:
+${text}`;
     const response = await this.llm.complete({
       taskType: "semantic_analysis",
       messages: [
         { role: "system", content: MULTI_SYSTEM_PROMPT },
         { role: "user", content: userPrompt },
       ],
-      maxTokens: 1000,
-      temperature: 0.3,
+      maxTokens: MULTI_ANALYSIS_MAX_TOKENS,
+      temperature: 0.1,
       stream: false,
-      timeoutMs: 10000,
+      timeoutMs: MULTI_ANALYSIS_TIMEOUT_MS,
     });
 
     try {
@@ -180,6 +191,95 @@ export class SemanticAnalyzer {
         createdAt: new Date(),
         updatedAt: new Date(),
       }];
+    }
+  }
+
+  async analyzeIncremental(
+    newText: string,
+    pendingText: string,
+    existingCards: CoreMeaningCard[],
+    languageCode: "zh" | "en",
+  ): Promise<{ cards: CoreMeaningCard[]; pendingText: string }> {
+    const inputText = (pendingText + "\n" + newText).trim();
+    if (!inputText) return { cards: [], pendingText: "" };
+
+    const langLabel = languageCode === "zh" ? "Chinese" : "English";
+    const recentCardsSummary = existingCards
+      .slice(-5)
+      .map((c) => `[${c.category}] ${c.content}`)
+      .join("\n");
+
+    const userPrompt = `Language: ${langLabel}
+Recent cards (context only — do NOT re-analyze these):
+${recentCardsSummary || "(none)"}
+
+Pending text from previous capture (may be incomplete):
+${pendingText || "(none)"}
+
+Newly captured text:
+${newText}
+
+Analyze the combined pending + new text.`;
+
+    const response = await this.llm.complete({
+      taskType: "semantic_analysis",
+      messages: [
+        { role: "system", content: INCREMENTAL_SYSTEM_PROMPT },
+        { role: "user", content: userPrompt },
+      ],
+      maxTokens: 400,
+      temperature: 0.1,
+      stream: false,
+      timeoutMs: MULTI_ANALYSIS_TIMEOUT_MS,
+    });
+
+    try {
+      console.log("[SemanticAnalyzer] analyzeIncremental raw:", response.content.slice(0, 400));
+      const raw = response.content.replace(/```json\n?|```/g, "").trim();
+      const parsed = JSON.parse(raw) as {
+        cards: { content: string; category: string }[];
+        pendingText: string;
+      };
+
+      const cards = (parsed.cards ?? []).map((item, i) => ({
+        id: `card_incr_${Date.now()}_${i}`,
+        sessionId: "",
+        content: enforceContentLimit(item.content || "", languageCode),
+        category: validateCategory(item.category),
+        sourceSegmentIds: [] as string[],
+        linkedCardIds: [] as string[],
+        linkType: null,
+        topicId: "",
+        visualizationFormat: "concise_text" as const,
+        isHighlighted: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }));
+
+      return {
+        cards: cards.filter((c) => c.content),
+        pendingText: (parsed.pendingText ?? "").trim(),
+      };
+    } catch (err) {
+      console.error("[SemanticAnalyzer] analyzeIncremental parse failed:", err);
+      // Fallback: treat all input as one complete card, no pending
+      return {
+        cards: [{
+          id: `card_incr_${Date.now()}`,
+          sessionId: "",
+          content: inputText.slice(0, 100),
+          category: "fact",
+          sourceSegmentIds: [],
+          linkedCardIds: [],
+          linkType: null,
+          topicId: "",
+          visualizationFormat: "concise_text" as const,
+          isHighlighted: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }],
+        pendingText: "",
+      };
     }
   }
 
@@ -277,28 +377,59 @@ Respond ONLY with valid JSON in this exact format:
   "mergedContent": null
 }`;
 
-const MULTI_SYSTEM_PROMPT = `You are a semantic analysis engine. Given a text passage, identify the key distinct points, opinions, facts, questions, decisions, or action items. Return them as a JSON array.
+const INCREMENTAL_SYSTEM_PROMPT = `You perform incremental semantic analysis on live meeting subtitle text captured via OCR from a Zoom or video call.
 
-CRITICAL: The "content" field MUST be in the SAME LANGUAGE as the input text.
-CRITICAL: Merge related clauses into ONE item. Do NOT split on commas or conjunctions. Each item should represent a complete, self-contained idea — not a sentence fragment.
-CRITICAL: Do NOT produce duplicate or near-duplicate items. If two clauses express the same idea, merge them into one.
-CRITICAL: Strip any speaker tags like [speaker_0], [speaker_1], [user] etc. from the output content. These are metadata — do NOT include them in the "content" field.
-CRITICAL: The ⭐IMPORTANT annotation is metadata indicating user-marked moments. These are the MOST IMPORTANT parts of the conversation — the user explicitly flagged them. You MUST create a dedicated item for each ⭐IMPORTANT section. NEVER merge, skip, or summarize away marked content. Do NOT include ⭐IMPORTANT in the output text.
+You receive:
+1. Recent existing cards (context only — do NOT regenerate or duplicate these)
+2. Pending text from the previous capture (may be an incomplete sentence carried over)
+3. Newly captured text
 
-Respond ONLY with a valid JSON array. Each element has this format:
+Your job:
+- Combine the pending text + new text into one continuous passage.
+- Extract COMPLETE thoughts as cards. Each card should be a self-contained point worth capturing in meeting notes.
+- Skip filler and transitional language ("okay so", "let me share my screen", "um", "alright", "can everyone hear me") — only extract substantive content.
+- If the trailing portion of the combined text is clearly mid-sentence or incomplete (e.g. ends with a conjunction, comma, or seems to be cut off), return it as "pendingText" so it can be combined with the next capture.
+- If the text ends at a natural sentence boundary, return empty pendingText.
+- Do NOT repeat points already covered by the existing cards.
+- Use the same language as the input.
+
+CRITICAL: Write content as a DIRECT summary — NOT in third person. Do NOT write "The speaker says..." or "Someone mentioned...". State the point directly: "Launch is delayed to Q3" not "The speaker said the launch is delayed".
+CRITICAL: NEVER use these phrases: "The speaker", "The person", "It was mentioned", "It was noted". Write as if stating the point directly.
+
+## Category Definitions
+
+- question: A request for information or clarification raised during the meeting. Explicit ("What is the timeline?") or implicit ("I'm wondering about the budget").
+- fact: Objective information, data, status update, or how something works. Verifiable or descriptive. No personal judgment.
+- opinion: Subjective judgment or personal viewpoint. Contains personal assessment — "I think", "I believe", "seems like", "I feel".
+- request: Asking someone to perform an action or provide something. Directed at another person. "Could you send me the doc?" "Can you review this by Friday?"
+- todo: A concrete actionable task with a specific action and assignee or deadline. Must be executable. "John will send the contract by Thursday" ✓. "We should think about this" ✗ (that's a proposal).
+- decision: A finalized choice that has been made. Uses definitive language: "decided", "confirmed", "we're going with". "We've decided to use Stripe" ✓. "We could use Stripe" ✗ (that's a proposal).
+- proposal: A suggestion not yet confirmed. Uses tentative language: "could", "suggest", "how about", "maybe", "what if".
+- response: Acknowledgment or confirmation. "Got it", "Sounds good", "Agreed". If it contains a committed action, classify as todo instead.
+
+When uncertain between proposal and todo: proposal = exploratory/tentative, todo = concrete/committed.
+When uncertain between opinion and fact: opinion = personal judgment, fact = verifiable information.
+
+Return ONLY valid JSON:
 {
-  "content": "<core meaning in ≤30 English words or ≤50 Chinese characters>",
-  "category": "<one of: fact, opinion, question, decision, todo, proposal, request, response>"
-}
+  "cards": [{"content": "...", "category": "fact"}],
+  "pendingText": "trailing incomplete text or empty string"
+}`;
 
-CRITICAL: Write content as a DIRECT summary — NOT in third person. NEVER use "The speaker", "The person", "It is stated", "Appreciation is expressed", or any passive/third-person phrasing. State the point directly as said. WRONG: "The speaker is upset" → RIGHT: "I'm upset about this". WRONG: "Appreciation is expressed" → RIGHT: "Thank you so much". WRONG: "The speaker disagrees" → RIGHT: "I disagree with that".
-CRITICAL: NO attribution or third person. Never use "I said," "I discussed," "The speaker mentioned," or "You are asking." Use DIRECT SPEECH — speak as if delivering the point right now. WRONG: "I am asking for clarification" or "You are asking for clarification" → RIGHT: "What exactly does this mean?"
+const MULTI_SYSTEM_PROMPT = `Extract key points from the input and return JSON only.
 
-Category guide: question = seeking info; fact = verifiable/objective; opinion = subjective judgment; request = asking others to act; todo = concrete task with action verb (specific & committed); decision = finalized choice; proposal = tentative suggestion (not yet committed); response = acknowledgment (if it contains a concrete committed action, use todo instead).
+Rules:
+- Use the same language as the input.
+- Prefer 1 item for short text.
+- Merge duplicates.
+- Remove speaker tags and ⭐IMPORTANT from output text.
+- Write direct meaning, not "the speaker said".
+- Keep content concise.
 
-Example: [{"content":"The meeting is at 3pm","category":"fact"},{"content":"We should cancel the project","category":"opinion"}]
+Categories: fact, opinion, question, decision, todo, proposal, request, response
 
-Return as many items as needed based on the text complexity. Short simple text = 1 item. Long text with multiple points = multiple items. Only merge items if they express the EXACT SAME intent and category. If two points have different intents or categories (e.g. a fact vs an opinion about the same topic), keep them as separate items even if they share similar wording.`;
+Return only:
+[{"content":"...","category":"fact"}]`;
 
 const DUPLICATE_SYSTEM_PROMPT = `You detect duplicate or rephrased points in a conversation. Given a new card and existing cards, determine if the new card duplicates an existing one.
 
@@ -498,6 +629,13 @@ function extractJson(text: string): Record<string, unknown> {
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error("No JSON found in response");
   return JSON.parse(jsonMatch[0]);
+}
+
+function inferMaxItems(text: string): number {
+  const trimmed = text.trim();
+  if (trimmed.length <= 160) return 1;
+  if (trimmed.length <= 420) return 2;
+  return 3;
 }
 
 /**

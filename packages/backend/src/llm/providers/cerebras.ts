@@ -1,18 +1,22 @@
 import { OpenAICompatibleAdapter } from "./openai-compatible.js";
 
+const DEFAULT_CEREBRAS_MODEL = "llama3.1-8b";
+
 /**
- * Cerebras GPT-OSS-120B — primary LLM provider.
+ * Cerebras Llama 3.1 8B — primary LLM provider.
  * Uses the OpenAI-compatible API at api.cerebras.ai.
- * 2,224 tokens/sec output, free tier 1M tokens/day.
+ *
+ * Default to the configured Cerebras production model. Override with CEREBRAS_MODEL when
+ * testing alternates.
  */
 export class CerebrasAdapter extends OpenAICompatibleAdapter {
   constructor() {
     super({
       id: "cerebras",
-      name: "Cerebras GPT-OSS-120B",
+      name: "Cerebras Llama 3.1 8B",
       apiKeyEnvVar: "CEREBRAS_API_KEY",
       baseURL: "https://api.cerebras.ai/v1",
-      model: "qwen-3-235b-a22b-instruct-2507",
+      model: process.env.CEREBRAS_MODEL?.trim() || DEFAULT_CEREBRAS_MODEL,
     });
   }
 }

@@ -318,7 +318,7 @@ describe("SemanticAnalyzer", () => {
 
       expect(capturedRequest).not.toBeNull();
       expect(capturedRequest!.taskType).toBe("semantic_analysis");
-      expect(capturedRequest!.timeoutMs).toBe(3000);
+      expect(capturedRequest!.timeoutMs).toBe(5000);
     });
   });
 

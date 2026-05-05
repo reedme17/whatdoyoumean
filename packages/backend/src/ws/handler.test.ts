@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { SessionManager, clearSessions } from "../session/manager.js";
 import { BookmarkService, clearBookmarks } from "../bookmark/service.js";
+import { buildSpeakerRunsFromWords } from "./handler.js";
 
 /**
  * Unit tests for the WebSocket handler logic.
@@ -90,5 +91,23 @@ describe("WebSocket handler — text:submit pipeline simulation", () => {
 
     const diagramCard = { ...textCard, category: "decision" as const };
     expect(viz.selectFormat(diagramCard)).toBe("flow_diagram");
+  });
+});
+
+describe("WebSocket handler — speaker run splitting", () => {
+  it("splits Deepgram words into contiguous speaker runs", () => {
+    const runs = buildSpeakerRunsFromWords([
+      { word: "hello", punctuatedWord: "Hello", speaker: 0 },
+      { word: "there", punctuatedWord: "there.", speaker: 0 },
+      { word: "ni", punctuatedWord: "你", speaker: 1 },
+      { word: "hao", punctuatedWord: "好", speaker: 1 },
+      { word: "again", punctuatedWord: "again", speaker: 0 },
+    ], "Hello there. 你好 again", "speaker_0");
+
+    expect(runs).toEqual([
+      { speakerId: "speaker_0", text: "Hello there." },
+      { speakerId: "speaker_1", text: "你好" },
+      { speakerId: "speaker_0", text: "again" },
+    ]);
   });
 });

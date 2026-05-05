@@ -10,10 +10,10 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces",
-    "build:shared": "npm run build -w packages/shared",
-    "build:backend": "npm run build -w packages/backend",
-    "build:electron": "npm run build -w packages/electron-app",
-    "dev:backend": "npm run dev -w packages/backend",
+    "build:shared": "npm --workspace packages/shared run build",
+    "build:backend": "npm --workspace packages/backend run build",
+    "build:electron": "npm --workspace packages/electron-app run build",
+    "dev:backend": "npm --workspace packages/backend run dev",
     "clean": "npm run clean --workspaces",
     "test": "npm run test --workspaces --if-present"
   },

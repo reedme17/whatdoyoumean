@@ -26,6 +26,8 @@ interface Props {
   onResponseEnabledChange?: (v: boolean) => void;
   onToggleMark?: (cardId: string) => void;
   summary?: string;
+  resultErrorMessage?: string | null;
+  recommendationErrorMessage?: string | null;
 }
 
 export function TextModeScreen({
@@ -40,9 +42,11 @@ export function TextModeScreen({
   onResponseEnabledChange,
   onToggleMark,
   summary,
+  resultErrorMessage,
+  recommendationErrorMessage,
 }: Props): React.JSX.Element {
   const [text, setText] = useState("");
-  const hasResults = cards.length > 0;
+  const hasResults = cards.length > 0 || !!resultErrorMessage;
 
   if (hasResults) {
     return (
@@ -75,6 +79,8 @@ export function TextModeScreen({
         }
         onResponseEnabledChange={onResponseEnabledChange}
         onToggleMark={onToggleMark}
+        resultErrorMessage={resultErrorMessage}
+        recommendationErrorMessage={recommendationErrorMessage}
       />
     );
   }

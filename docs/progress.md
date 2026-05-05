@@ -20,7 +20,7 @@ Built the complete backend service. 283 tests passing.
 
 ### LLM Gateway (`packages/backend/src/llm/`)
 - `gateway.ts`: Unified LLM call interface with provider registration and fallback
-- `providers/cerebras.ts`: Cerebras integration, model `llama3.1-8b` (free tier, will switch to `gpt-oss-120b` later)
+- `providers/cerebras.ts`: Cerebras integration, model `gpt-oss-120b`
 - `providers/openai.ts`: OpenAI GPT integration
 - `providers/anthropic.ts`: Claude integration
 - `providers/google.ts`: Gemini integration
@@ -124,8 +124,8 @@ Fixed 5 stacked bugs. Documented in `docs/bug-report-websocket-llm-integration.m
 1. **Electron blank page**: No bundler — renderer JSX/TS couldn't run in browser → added esbuild
 2. **Fastify/Socket.IO conflict**: Both sharing same HTTP server caused route conflicts → separated to port 3000 (REST) and 3001 (WS)
 3. **Zombie processes on ports**: Previous processes didn't exit cleanly → `lsof -ti :3000 | xargs kill`
-4. **Wrong Cerebras model name**: Used non-existent model → changed to `llama3.1-8b`
-5. **GPT-OSS-120B unavailable**: Free tier temporary rate limit → using llama3.1-8b for now
+4. **Wrong Cerebras model name**: Updated to `gpt-oss-120b`
+5. **GPT-OSS-120B availability**: Current target model is `gpt-oss-120b`
 
 ---
 
@@ -471,7 +471,7 @@ packages/
 - `mise.toml`: Node 22
 - Backend REST: `http://localhost:3000`
 - Backend WS: `ws://localhost:3001`
-- Cerebras model: `llama3.1-8b` (to change model, edit `providers/cerebras.ts`)
+- Cerebras model: `gpt-oss-120b` (to change model, edit `providers/cerebras.ts`)
 
 ---
 
